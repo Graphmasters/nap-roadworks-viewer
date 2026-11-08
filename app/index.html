@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NAP Roadworks Viewer</title>
+    <meta name="description" content="Inspect DATEX II roadworks and road-closure feeds in your browser: XML, schema and profile checks, map, OpenStreetMap lookup, lane comparison and passability analysis." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23c8102e'/%3E%3Cpath d='M6 24h20L16 7z' fill='%23fff'/%3E%3Cpath d='M16 13v6' stroke='%23c8102e' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='21.5' r='1.4' fill='%23c8102e'/%3E%3C/svg%3E" />
+  </head>
+  <body data-view="feed">
+    <header class="topbar">
+      <h1>NAP Roadworks Viewer</h1>
+      <button id="pick" type="button" class="primary">Open DATEX II file…</button>
+      <input id="file" type="file" accept=".xml,.gz,application/xml,text/xml,application/gzip" hidden />
+      <div class="modes" role="group" aria-label="Map click mode">
+        <button id="mode-records" type="button">Select record</button>
+        <button id="mode-osm" type="button">Select OSM road</button>
+      </div>
+      <nav class="views" aria-label="Panes">
+        <button type="button" data-view="feed" class="active">Feed</button>
+        <button type="button" data-view="map">Map</button>
+        <button type="button" data-view="inspector">Inspector</button>
+      </nav>
+      <a class="gh" href="https://github.com/Graphmasters/nap-roadworks-viewer" target="_blank" rel="noopener noreferrer">Source</a>
+    </header>
+
+    <main class="layout">
+      <aside class="pane feed" aria-label="Feed">
+        <section id="intro">
+          <h2>Inspect a DATEX II roadworks feed</h2>
+          <p>
+            Open or drop a DATEX II XML file (v2 or v3, plain or gzip-compressed), for example a roadworks or closure publication
+            downloaded from a National Access Point.
+          </p>
+          <p><button id="intro-pick" type="button" class="primary">Open file…</button></p>
+          <p class="muted">
+            The file is processed in your browser and is not uploaded. Only when you look up an OpenStreetMap road is its way id
+            sent to the OSM API; map tiles come from OpenFreeMap.
+          </p>
+          <details>
+            <summary>What it checks</summary>
+            <ul>
+              <li>XML well-formedness, DATEX II version, publication type, namespaces and extensions</li>
+              <li>XSD validation against schema files you select</li>
+              <li>Heuristic profile checks (MDM roadworks profile, NDW)</li>
+              <li>Roadworks and closures with line geometry on the map; other location types are listed with a reason</li>
+              <li>Lane status (laneStatusCoded) against OSM lane tags</li>
+              <li>Closures that contradict their linked records (DQ-RW-001)</li>
+            </ul>
+          </details>
+        </section>
+        <div id="progress" class="progress" hidden>
+          <div class="bar"><div id="progress-bar"></div></div>
+          <p id="progress-text" class="muted"></p>
+        </div>
+        <details class="block" open>
+          <summary>Report</summary>
+          <div id="report"></div>
+        </details>
+        <details class="block" open>
+          <summary>Records</summary>
+          <div id="records" class="records"></div>
+        </details>
+      </aside>
+
+      <section class="pane mapwrap" aria-label="Map">
+        <div id="map"></div>
+        <p id="hint" class="hint" hidden></p>
+      </section>
+
+      <aside id="inspector" class="pane inspector" aria-label="Inspector" aria-live="polite"></aside>
+    </main>
+
+    <div class="dropzone" aria-hidden="true"><p>Drop the DATEX II file to analyse it</p></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

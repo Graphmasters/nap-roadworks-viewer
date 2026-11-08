@@ -1,0 +1,53 @@
+{
+  "name": "@graphmasters/nap-roadworks-viewer",
+  "version": "0.1.0",
+  "description": "Inspect DATEX II roadworks and road-closure feeds in the browser: XML/profile checks, map, OSM road lookup, lane comparison and passability analysis.",
+  "keywords": ["datex2", "datexii", "napcore", "national-access-point", "roadworks", "road-closure", "openstreetmap", "maplibre"],
+  "license": "Apache-2.0",
+  "author": "Graphmasters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Graphmasters/nap-roadworks-viewer.git"
+  },
+  "homepage": "https://graphmasters.github.io/nap-roadworks-viewer/",
+  "bugs": "https://github.com/Graphmasters/nap-roadworks-viewer/issues",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist", "NOTICE", "ATTRIBUTION.md"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:app": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "lane-status-viewer": "0.1.1",
+    "saxes": "6.0.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "7946.0.16",
+    "maplibre-gl": "~5.24.0",
+    "tsup": "~8.5.1",
+    "typescript": "~5.9.3",
+    "vite": "~7.3.7",
+    "vitest": "~3.2.7",
+    "xmllint-wasm": "5.3.0"
+  }
+}

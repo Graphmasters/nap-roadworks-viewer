@@ -1,0 +1,17 @@
+nap-roadworks-viewer
+Copyright 2026 Graphmasters GmbH
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It bundles third-party software under their own licences:
+
+  * osm-lanes (Apache-2.0), Copyright 2026 Graphmasters GmbH, which itself
+    includes Pinhead icons (CC0 1.0) and German road-sign images (public domain
+    under German law, § 5 UrhG).
+  * lane-status-viewer (MIT), Copyright (c) 2026 Graphmasters.
+  * saxes (ISC).
+
+The demo application additionally bundles MapLibre GL JS (BSD-3-Clause) and
+xmllint-wasm / libxml2 (MIT).
+
+See ATTRIBUTION.md for details and for map data credits.
