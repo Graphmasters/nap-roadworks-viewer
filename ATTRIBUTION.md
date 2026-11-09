@@ -37,3 +37,7 @@ Way tags shown in the inspector are fetched live from the [OSM API](https://wiki
 
 The repository contains no DATEX II data from any publisher. Test fixtures are hand-written. Feeds
 you open in the viewer stay in your browser; credit their publishers as their licences require.
+
+The README screenshot (`docs/screenshot.webp`) shows roadworks data of the
+[Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein (LBV.SH)](https://mobilithek.info/offers/110000000003237002),
+published on Mobilithek licence-free.
