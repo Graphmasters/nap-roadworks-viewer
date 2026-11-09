@@ -21,6 +21,7 @@ export { feedChecks, recordChecks } from './validation/rules'
 export {
   matchEvent,
   linesOf,
+  recordWayOrientation,
   WEIGHTS,
   AMBIGUITY_MARGIN,
   MERGED_PENALTY,

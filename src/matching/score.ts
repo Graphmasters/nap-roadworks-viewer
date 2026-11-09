@@ -321,3 +321,29 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
   }
   return { status, sequence, coverage, confidence: status === 'none' ? 0 : top.score, ranked, samples: samples.length, reasons }
 }
+
+/** Below this mean agreement (cosine of the angle) the record runs across the way, not along it. */
+const MIN_ORIENTATION = 0.3
+
+/**
+ * Whether an event line runs in the drawing direction of a way (`1`), against it (`-1`), or
+ * neither can be told (`0`: the line stays more than `bufferM` from the way, or crosses it).
+ * Only the part of the event within `bufferM` of the way counts.
+ */
+export function recordWayOrientation(eventLines: LonLat[][], way: LonLat[], bufferM = 25): 1 | -1 | 0 {
+  if (way.length < 2) return 0
+  const { project } = projector(eventLines)
+  const samples = sampleLines(eventLines.map((l) => l.map(project)), 400)
+  const wayLine = [way.map(project)]
+  let sum = 0
+  let k = 0
+  for (const s of samples) {
+    const n = nearest(s.x, s.y, wayLine)
+    if (n.d > bufferM) continue
+    sum += Math.cos(((s.bearing - n.bearing) * Math.PI) / 180)
+    k++
+  }
+  if (!k) return 0
+  const mean = sum / k
+  return mean > MIN_ORIENTATION ? 1 : mean < -MIN_ORIENTATION ? -1 : 0
+}

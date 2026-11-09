@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "lane-status-viewer": "0.1.1",
-    "osm-lanes": "0.1.0",
+    "osm-lanes": "0.3.0",
     "saxes": "6.0.0"
   },
   "devDependencies": {
