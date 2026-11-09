@@ -1,7 +1,8 @@
 // Left panel, "Records" section: filters and a virtualised list (feeds can have 60 000+ records).
 
-import type { AnalysisResult, Passability, RestrictionType, RoadEvent } from '../src/index'
+import { LANE_CATEGORIES, laneCategoriesOf, type AnalysisResult, type LaneCategory, type Passability, type RestrictionType, type RoadEvent } from '../src/index'
 import { clear, h } from './dom'
+import { laneCategoryIcon } from './lane-icons'
 import { TYPE_COLORS } from './map'
 
 export interface RecordFilter {
@@ -10,6 +11,8 @@ export interface RecordFilter {
   location: 'any' | 'drawn' | 'not-drawn'
   activeNow: boolean
   text: string
+  /** Lane configurations; a record matches when it has any of them. Empty = no lane filter. */
+  lanes: Set<LaneCategory>
 }
 
 export const TYPE_LABEL: Record<RestrictionType, string> = {
@@ -37,8 +40,11 @@ export class RecordList {
     location: 'any',
     activeNow: false,
     text: '',
+    lanes: new Set(),
   }
   private result: AnalysisResult | null = null
+  /** Lane categories per event index. */
+  private laneCats: LaneCategory[][] = []
   private visible: number[] = []
   private selected: number | null = null
   private viewport: HTMLElement
@@ -65,6 +71,8 @@ export class RecordList {
   setResult(r: AnalysisResult | null) {
     this.result = r
     this.selected = null
+    this.laneCats = r ? r.events.map((e) => laneCategoriesOf(e.laneCodes)) : []
+    this.filter.lanes.clear()
     this.renderControls()
     this.apply()
   }
@@ -116,12 +124,41 @@ export class RecordList {
         this.apply()
       }, 200)
     })
-    this.controls.append(chips, h('div', { class: 'row' }, pass, loc, h('label', { class: 'chip' }, active, 'active now')), search)
+    this.controls.append(chips, h('div', { class: 'row' }, pass, loc, h('label', { class: 'chip' }, active, 'active now')), this.laneControls() ?? '', search)
   }
 
-  private matches(e: RoadEvent, now: number): boolean {
+  /** Lane-configuration chips, only when the feed has lane status codes. */
+  private laneControls(): HTMLElement | null {
+    const r = this.result!
+    if (!r.events.some((e) => e.laneCodes.length)) return null
+    const counts = new Map<LaneCategory, number>()
+    for (const cats of this.laneCats) for (const c of cats) counts.set(c, (counts.get(c) ?? 0) + 1)
+    const chips = h('div', { class: 'chips lane-chips' })
+    for (const spec of LANE_CATEGORIES) {
+      const n = counts.get(spec.id) ?? 0
+      const cb = h('input', { type: 'checkbox', disabled: n === 0, checked: this.filter.lanes.has(spec.id) })
+      cb.addEventListener('change', () => {
+        if (cb.checked) this.filter.lanes.add(spec.id)
+        else this.filter.lanes.delete(spec.id)
+        this.apply()
+      })
+      chips.append(
+        h('label', { class: `chip${n ? '' : ' empty'}`, title: `Lane status codes with ${spec.rule}` }, cb, laneCategoryIcon(spec.id, 16), `${spec.label} (${n.toLocaleString('en')})`),
+      )
+    }
+    return h(
+      'details',
+      { class: 'lane-filter', open: true },
+      h('summary', null, 'Lane configuration'),
+      h('p', { class: 'muted' }, 'Records whose laneStatusCoded or extendedLaneStatusCoded shows any of the selected configurations.'),
+      chips,
+    )
+  }
+
+  private matches(e: RoadEvent, i: number, now: number): boolean {
     const f = this.filter
     if (!f.types.has(e.type)) return false
+    if (f.lanes.size && !this.laneCats[i]!.some((c) => f.lanes.has(c))) return false
     if (f.passability !== 'any' && this.result!.recordPassability[e.id]?.classification !== f.passability) return false
     if (f.location === 'drawn' && !e.geometry) return false
     if (f.location === 'not-drawn' && e.geometry) return false
@@ -143,7 +180,7 @@ export class RecordList {
     if (r) {
       const now = Date.now()
       r.events.forEach((e, i) => {
-        if (this.matches(e, now)) this.visible.push(i)
+        if (this.matches(e, i, now)) this.visible.push(i)
       })
     }
     const drawn = r ? this.visible.filter((i) => r.events[i]!.geometry).length : 0

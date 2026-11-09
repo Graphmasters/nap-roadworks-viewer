@@ -22,7 +22,7 @@ Days 2026). A separate explorer will add routing on top of it. This repository h
 | **XSD validation** | Real schema validation with libxml2 (WebAssembly) against XSD files you select. The UI says "not performed" until you do. |
 | **Profile checks** | Profile detection (MDM roadworks profile 04-00-00, NDW situation feeds, generic v2/v3) with heuristic rules, labelled as heuristics. |
 | **Extensions** | Official extension mechanisms (v2 `…Extension`, v3 `_…Extension`) apart from other namespaces, with element counts. |
-| **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. |
+| **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. Feeds with lane status codes get a lane-configuration filter (reversible lane, hard shoulder open/closed, narrowed or closed lane, parking lane and restrictions, cycleway and pedestrian path open/closed) with lane-status-viewer icons, which also mark records in the Situation tab. |
 | **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line (coverage, distance, direction, road number, class), shows the components, and reports *ambiguous* or *no match*. A merged tile feature that wins is split into its OSM ways via Overpass and scored again. |

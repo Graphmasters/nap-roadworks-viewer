@@ -660,3 +660,29 @@ body.dragging .dropzone {
   background: var(--graphic-bg);
   border-radius: 8px;
 }
+
+/* Lane-configuration filter and the small lane-status-viewer icons. */
+.lane-filter {
+  margin: 6px 0;
+}
+.lane-filter summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.lane-filter p {
+  margin: 4px 0;
+}
+.lane-chips .chip.empty {
+  color: var(--muted);
+  opacity: 0.6;
+}
+.lane-icon {
+  flex: none;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.lane-icons {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
