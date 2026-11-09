@@ -298,10 +298,10 @@ async function runMatch() {
   if (!lines.length) return
   matchAbort?.abort()
   const ac = (matchAbort = new AbortController())
-  state.match = { status: 'loading', note: 'Reading road features from the map…' }
+  state.match = { status: 'loading', note: 'Reading road tiles…' }
   render()
   try {
-    const { candidates, viewports, truncated } = await roadMap.collectCandidates(
+    const { candidates, tiles, failed, truncated } = await roadMap.collectCandidates(
       lines,
       (note) => {
         if (ac.signal.aborted) return
@@ -331,7 +331,7 @@ async function runMatch() {
     )
     state.overpass = undefined
     if (ac.signal.aborted) return
-    state.match = { status: 'done', value: { ...m, viewports, truncated } }
+    state.match = { status: 'done', value: { ...m, tiles, failedTiles: failed, truncated } }
     roadMap.showCandidates(m)
     const first = m.sequence[0]
     if (m.status !== 'none' && first) {

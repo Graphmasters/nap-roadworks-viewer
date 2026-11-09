@@ -17,6 +17,7 @@ The source code of nap-roadworks-viewer is licensed under the Apache License 2.0
 |---|---|---|
 | [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) | BSD-3-Clause | Map rendering. |
 | [xmllint-wasm](https://github.com/noppa/xmllint-wasm) (libxml2) | MIT | XSD validation in the browser. |
+| [@mapbox/vector-tile](https://github.com/mapbox/vector-tile-js), [pbf](https://github.com/mapbox/pbf) | BSD-3-Clause | Decoding vector tiles for matching. |
 
 ## Map
 

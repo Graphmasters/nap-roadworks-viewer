@@ -236,3 +236,21 @@ describe('lane comparison and matching', async () => {
     expect(failed.refinements[0]!.error).toMatch(/504/)
   })
 })
+
+describe('tile reading', async () => {
+  const { lonLatToTile, tilesAlong } = await import('../app/tiles')
+  it('finds the z14 tiles along a record', () => {
+    expect(lonLatToTile(13.4, 52.52)).toEqual([8801, 5373]) // Berlin: (13.4 + 180) / 360 * 2^14 = 8801.8
+    const one = tilesAlong([[[13.4005, 52.5205], [13.401, 52.521]]])
+    expect(one).toEqual([[8801, 5373]])
+    // 10 km eastwards at 52.5° N crosses about 7 tiles (~1.49 km wide); the 60 m pad adds none here.
+    const long = tilesAlong([[[13.4005, 52.5205], [13.548, 52.5205]]])
+    expect(long.length).toBeGreaterThanOrEqual(7)
+    expect(long.length).toBeLessThanOrEqual(9)
+    expect(new Set(long.map(([, y]) => y))).toEqual(new Set([5373]))
+    // Near a tile border the pad pulls in the neighbour.
+    const [x0] = lonLatToTile(13.4, 52.52)
+    const edgeLon = ((x0 + 1) / 2 ** 14) * 360 - 180 - 0.0003 // ~20 m west of the border
+    expect(tilesAlong([[[edgeLon, 52.5205], [edgeLon, 52.5206]]]).map(([x]) => x).sort()).toEqual([x0, x0 + 1])
+  })
+})

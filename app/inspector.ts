@@ -17,7 +17,7 @@ export interface InspectorState {
   tab: Tab
   xml: Loadable<{ which: 'record' | 'situation'; text: string }>
   way: Loadable<OsmWay> & { id?: string }
-  match: Loadable<RefinedMatchResult & { viewports: number; truncated: boolean }>
+  match: Loadable<RefinedMatchResult & { tiles: number; failedTiles: number; truncated: boolean }>
   /** Candidate key confirmed by the user (manual override). */
   confirmedKey?: string
   /** Set while an Overpass request for matching is pending: what is being looked up. */
@@ -265,8 +265,9 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
   const m = s.match.value
   const statusText = { matched: 'matched', ambiguous: 'ambiguous: no unambiguous match', none: 'no match' }[m.status]
   append(el, 
-    h('p', null, badge(statusText, m.status === 'matched' ? 'ok' : m.status === 'ambiguous' ? 'warning' : 'error'), ` · confidence score ${m.confidence.toFixed(2)} · ${Math.round(m.coverage * 100)}% of the record explained · ${m.samples} samples · ${m.viewports} map view(s)`),
+    h('p', null, badge(statusText, m.status === 'matched' ? 'ok' : m.status === 'ambiguous' ? 'warning' : 'error'), ` · confidence score ${m.confidence.toFixed(2)} · ${Math.round(m.coverage * 100)}% of the record explained · ${m.samples} samples · ${m.tiles} z14 tile(s)`),
     m.truncated ? h('p', { class: 'warning' }, 'The record is long; only part of it was searched.') : null,
+    m.failedTiles ? h('p', { class: 'warning' }, `${m.failedTiles} tile(s) could not be loaded; roads there are missing.`) : null,
     h('ul', { class: 'compact' }, ...m.reasons.map((x) => h('li', null, x))),
   )
   const table = h('table', { class: 'cands' })

@@ -60,13 +60,15 @@ both directions open.
   `osmId × 10 + type`. Features merged from several ways (suffix 0) are common even at zoom 14,
   and their id names only the first way. For those the viewer looks up the clicked way by location
   with a ~25 m bounding-box query to the OSM API.
-- **Matching** samples the record line and scores candidates from the rendered tiles. Long records
-  are visited viewport by viewport (up to 20). The score ranks candidates; it is not a calibrated
-  probability. When the best candidate is a merged tile feature, the viewer asks Overpass for the
+- **Matching** samples the record line and scores candidates read straight from the z14 vector tiles
+  along the record (up to 150 tiles; the visible map does not move). z14 is the highest zoom of
+  OpenFreeMap, so these are the geometries the map shows. The score ranks candidates; it is not a
+  calibrated probability. When the best candidate is a merged tile feature, the viewer asks Overpass for the
   ways with the same `highway` value (from the tile's road class) inside the part of the record that
-  feature covers, and scores them in its place (up to 3 rounds). If `overpass-api.de` fails, small
-  boxes (≤ 0.0005 square degrees) are asked from the OSM API instead, and otherwise
-  `overpass.private.coffee` is tried. If all fail, the merged feature is kept and marked as such.
+  feature covers, and scores them in its place (up to 3 rounds). Boxes up to 500 × 500 m are asked
+  from the OSM API first, then from Overpass. Larger boxes go to `overpass-api.de` first, then, up to
+  0.0005 square degrees, to the OSM API, then to `overpass.private.coffee`. If all fail, the merged
+  feature is kept and marked as such.
 - **Lanes.** OSM lane tags describe the usual layout and DATEX II a temporary one. A difference is a
   hint, not an error. Direction mapping between DATEX II and OSM is not verified.
 - **Size.** Files are streamed in a Web Worker. A 209 MB (16 MB gzipped) feed with 61 000 records
