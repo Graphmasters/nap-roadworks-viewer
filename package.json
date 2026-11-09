@@ -51,7 +51,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "lane-status-viewer": "0.1.1",
+    "lane-status-viewer": "0.1.2",
     "osm-lanes": "0.3.0",
     "saxes": "6.0.0"
   },
