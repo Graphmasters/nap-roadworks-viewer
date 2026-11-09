@@ -4,7 +4,7 @@
 import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
 import { compareLanes, laneCategoriesOf, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
-import { append, badge, clear, dl, formatTime, h, link, spinner } from './dom'
+import { append, badge, clear, dl, formatTime, h, link, spinner, type Child } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
 
@@ -23,6 +23,8 @@ export interface InspectorState {
   confirmedKey?: string
   /** Set while an Overpass request for matching is pending: what is being looked up. */
   overpass?: string
+  /** OSM ways loaded so far (OSM tab, matching), by way id. */
+  ways?: ReadonlyMap<string, OsmWay>
 }
 
 /** What OSM data is being fetched right now, if any. */
@@ -187,7 +189,7 @@ function renderLanes(el: HTMLElement, s: InspectorState, e: RoadEvent) {
     osmLaneFigure(way, { showSigns: false, caption: 'Usual layout according to OSM (osm-lanes), in way direction' }) ?? h('p', { class: 'muted' }, 'No lane diagram for this way.'),
   )
   const matched = s.match.status === 'done' ? s.match.value.ranked.find((r) => r.candidate.osmWayId === way.id || r.candidate.key === s.confirmedKey) : undefined
-  const cmp = compareLanes(e, osmLaneAttributes('way', way.id, way.tags), matched?.score)
+  const cmp = compareLanes(e, osmLaneAttributes('way', way.id, way.tags), matched?.quality)
   append(el, 
     h('h3', null, 'Comparison'),
     dl([
@@ -254,7 +256,7 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
 function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: InspectorCallbacks) {
   const hasLine = e.geometry?.type === 'LineString' || e.geometry?.type === 'MultiLineString'
   append(el, 
-    h('p', { class: 'muted' }, 'Matches the record line against OSM roads from the vector tiles (merged features are split into their OSM ways via Overpass): coverage within 25 m, distance, direction, road number and class. The score ranks candidates; it is not a probability.'),
+    h('p', { class: 'muted' }, 'Matches the record line against OSM roads from the vector tiles. Score = coverage (share of the record within 25 m) × quality (distance, direction, road number, class), so roads that explain more of the record win. Single OSM ways are preferred over merged tile features; a merged feature that still wins is split into its OSM ways. The score ranks candidates; it is not a probability.'),
     h('button', { type: 'button', disabled: !hasLine || s.match.status === 'loading', onclick: () => cb.runMatch() }, s.match.status === 'done' ? 'Match again' : 'Match to OSM'),
   )
   if (!hasLine) {
@@ -273,7 +275,23 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
     h('ul', { class: 'compact' }, ...m.reasons.map((x) => h('li', null, x))),
   )
   const table = h('table', { class: 'cands' })
-  table.append(h('tr', null, h('th', null, 'Candidate'), h('th', null, 'Score'), h('th', { title: `weight ${WEIGHTS.coverage}` }, 'Cov.'), h('th', { title: `weight ${WEIGHTS.distance}` }, 'Dist.'), h('th', { title: `weight ${WEIGHTS.bearing}` }, 'Dir.'), h('th', { title: `weight ${WEIGHTS.ref}` }, 'Ref'), h('th', null, '')))
+  table.append(
+    h(
+      'tr',
+      null,
+      h('th', null, ''),
+      h('th', null, 'Candidate'),
+      h('th', { title: 'coverage × quality' }, 'Score'),
+      h('th', { title: 'Share of the record within 25 m; multiplies the quality' }, 'Cov.'),
+      h('th', { title: 'Quality of the covered part: weighted mean of distance, direction, road number and class' }, 'Qual.'),
+      h('th', { title: `weight ${WEIGHTS.distance} in the quality` }, 'Dist.'),
+      h('th', { title: `weight ${WEIGHTS.bearing} in the quality` }, 'Dir.'),
+      h('th', { title: `weight ${WEIGHTS.ref} in the quality` }, 'Ref'),
+      h('th', { title: 'OSM lanes (osm-lanes), once the way has been loaded' }, 'Lanes'),
+    ),
+  )
+  // Candidate keys break after each "/" so the table fits the side panel.
+  const keyText = (key: string): Child[] => key.split('/').flatMap((p, i, a) => (i < a.length - 1 ? [`${p}/`, h('wbr')] : [p]))
   const seq = new Set(m.sequence.map((x) => x.candidate.key))
   for (const r of m.ranked.slice(0, 15)) {
     const c = r.candidate
@@ -282,17 +300,35 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
       h(
         'tr',
         { class: seq.has(c.key) ? 'chosen' : '', title: r.reasons.join('\n') },
-        h('td', null, c.osmWayId ? link(`https://www.openstreetmap.org/way/${c.osmWayId}`, c.key) : h('span', { class: 'muted' }, c.key), h('div', { class: 'muted' }, [c.roadClass, c.ref].filter(Boolean).join(' · '))),
+        h('td', null, h('button', { type: 'button', class: s.confirmedKey === c.key ? 'active' : '', title: c.merged ? 'Merged tile feature: the way is looked up by location in the OSM API' : '', onclick: () => cb.chooseCandidate(c.key, c.osmWayId) }, s.confirmedKey === c.key ? 'selected' : 'use')),
+        h('td', { class: 'cand-key' }, c.osmWayId ? link(`https://www.openstreetmap.org/way/${c.osmWayId}`, keyText(c.key)) : h('span', { class: 'muted' }, keyText(c.key)), h('div', { class: 'muted' }, [c.roadClass, c.ref].filter(Boolean).join(' · '))),
         h('td', null, r.score.toFixed(2)),
         h('td', null, pct(r.components.coverage)),
+        h('td', null, pct(r.quality)),
         h('td', null, pct(r.components.distance)),
         h('td', null, pct(r.components.bearing)),
         h('td', null, r.components.ref === 0.5 ? '–' : pct(r.components.ref)),
-        h('td', null, h('button', { type: 'button', class: s.confirmedKey === c.key ? 'active' : '', title: c.merged ? 'Merged tile feature: the way is looked up by location in the OSM API' : '', onclick: () => cb.chooseCandidate(c.key, c.osmWayId) }, s.confirmedKey === c.key ? 'selected' : 'use')),
+        h('td', { class: 'cand-lanes' }, candidateLanes(c.tags ?? (c.osmWayId ? s.ways?.get(c.osmWayId)?.tags : undefined))),
       ),
     )
   }
-  append(el, table, h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison. merged/… candidates are tile features merged from several ways. When one is the best candidate, its OSM ways of the same road class are fetched from Overpass and scored in its place.'))
+  append(el, h('div', { class: 'table-scroll' }, table), h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison; the Lanes column shows the OSM lanes of every way loaded so far (· not loaded, – no lane tags). merged/… candidates are tile features merged from several ways.'))
+}
+
+/** Tiny OSM lane graphic for the candidate table, or a dash when the way's tags are not loaded. */
+function candidateLanes(tags: Record<string, string> | undefined): Node | string {
+  if (!tags) return h('span', { class: 'muted', title: 'OSM data not loaded yet' }, '·')
+  const svg = renderLanesElement(tags, { showSigns: false })
+  if (!svg) return h('span', { class: 'muted', title: 'No lane tags in OSM' }, '–')
+  const [, , w, hgt] = (svg.getAttribute('viewBox') ?? '0 0 1 1').split(/\s+/).map(Number)
+  const height = 22
+  svg.setAttribute('height', String(height))
+  svg.setAttribute('width', String(Math.max(8, Math.round((height * (w || 1)) / (hgt || 1)))))
+  svg.classList.add('lanes-tiny')
+  const title = document.createElementNS('http://www.w3.org/2000/svg', 'title')
+  title.textContent = [tags['lanes'] ? `lanes=${tags['lanes']}` : '', tags['turn:lanes'] ? `turn:lanes=${tags['turn:lanes']}` : ''].filter(Boolean).join(', ') || 'OSM lanes'
+  svg.prepend(title)
+  return svg
 }
 
 /**

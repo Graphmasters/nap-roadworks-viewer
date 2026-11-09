@@ -160,8 +160,8 @@ export async function matchEventRefined(
     for (const w of ways) {
       if (w.geometry.length < 2) continue
       const known = byWay.get(w.id)
-      if (known) updated.set(known.key, { ...known, ref: known.ref ?? w.tags['ref'], oneway: onewayOf(w.tags), lines: [w.geometry] })
-      else fresh.push({ key: `way/${w.id}`, osmWayId: w.id, roadClass: c.roadClass, ref: w.tags['ref'], oneway: onewayOf(w.tags), lines: [w.geometry] })
+      if (known) updated.set(known.key, { ...known, ref: known.ref ?? w.tags['ref'], oneway: onewayOf(w.tags), lines: [w.geometry], tags: w.tags })
+      else fresh.push({ key: `way/${w.id}`, osmWayId: w.id, roadClass: c.roadClass, ref: w.tags['ref'], oneway: onewayOf(w.tags), lines: [w.geometry], tags: w.tags })
     }
     const count = fresh.length + updated.size
     const source = ways.find((w) => w.source)?.source

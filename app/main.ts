@@ -236,6 +236,7 @@ async function loadXml(which: 'record' | 'situation') {
 
 // ------------------------------------------------------------------------------------------- OSM
 const wayCache = new Map<string, OsmWay>()
+state.ways = wayCache
 let wayAbort: AbortController | undefined
 
 async function loadWay(id: string, showTab: boolean) {
@@ -333,7 +334,8 @@ async function runMatch() {
     if (ac.signal.aborted) return
     state.match = { status: 'done', value: { ...m, tiles, failedTiles: failed, truncated } }
     roadMap.showCandidates(m)
-    const first = m.sequence[0]
+    // Load the best-scoring way of the sequence (not the first along the record): it explains most.
+    const first = m.ranked.find((r) => m.sequence.includes(r))
     if (m.status !== 'none' && first) {
       state.confirmedKey = first.candidate.key
       const mid = midpoint(first.candidate.lines)

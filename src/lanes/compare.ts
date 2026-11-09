@@ -57,7 +57,8 @@ export function osmLaneAttributes(osmType: OsmLaneAttributes['osmType'], osmId: 
   }
 }
 
-export function compareLanes(event: RoadEvent, osm: OsmLaneAttributes, matchConfidence?: number): LaneComparison {
+/** `matchQuality`: quality of the match between the record and this way (ScoredCandidate.quality). */
+export function compareLanes(event: RoadEvent, osm: OsmLaneAttributes, matchQuality?: number): LaneComparison {
   const ind: LaneIndicator[] = []
   const picked = laneEvidenceOf(event.laneCodes)
   const field = event.laneCodes.find((c) => c.value === picked.code)?.field ?? ''
@@ -110,11 +111,11 @@ export function compareLanes(event: RoadEvent, osm: OsmLaneAttributes, matchConf
     if (datex.noStoppingStrips > 0)
       ind.push({ id: 'no-stopping', severity: 'info', message: 'DATEX II marks no-stopping strips. These are not lane closures.' })
   }
-  if (matchConfidence !== undefined && matchConfidence < 0.6)
+  if (matchQuality !== undefined && matchQuality < 0.6)
     ind.push({
       id: 'weak-match',
       severity: 'warning',
-      message: `The record matches this OSM way only weakly (score ${matchConfidence.toFixed(2)}). The comparison may concern a different road.`,
+      message: `The record matches this OSM way only weakly (match quality ${matchQuality.toFixed(2)}). The comparison may concern a different road.`,
     })
   return { datex, osm, indicators: ind, assessment }
 }

@@ -29,7 +29,7 @@ export function clear(el: Element): void {
   while (el.firstChild) el.firstChild.remove()
 }
 
-export function link(href: string, text: string): HTMLAnchorElement {
+export function link(href: string, text: Child): HTMLAnchorElement {
   return h('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text)
 }
 

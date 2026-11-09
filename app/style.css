@@ -686,3 +686,30 @@ body.dragging .dropzone {
   gap: 2px;
   vertical-align: middle;
 }
+
+/* Matching candidate table: fits the side panel; the "use" button comes first so it stays visible. */
+.table-scroll {
+  overflow-x: auto;
+}
+table.cands th,
+table.cands td {
+  padding: 3px 3px;
+}
+table.cands td:not(.cand-key) {
+  white-space: nowrap;
+}
+table.cands .cand-key {
+  min-width: 7em;
+}
+table.cands button {
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
+/* Tiny OSM lane graphic in the matching candidate table. */
+.cand-lanes {
+  white-space: nowrap;
+}
+.lanes-tiny {
+  vertical-align: middle;
+}

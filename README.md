@@ -25,7 +25,7 @@ compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswi
 | **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. Feeds with lane status codes get a lane-configuration filter (reversible lane, hard shoulder open/closed, narrowed or closed lane, parking lane and restrictions, cycleway and pedestrian path open/closed) with lane-status-viewer icons, which also mark records in the Situation tab. |
 | **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
-| **Matching** | Scores OSM road candidates against a record line (coverage, distance, direction, road number, class), shows the components, and reports *ambiguous* or *no match*. A merged tile feature that wins is split into its OSM ways via Overpass and scored again. |
+| **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
 | **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
 | **Passability** | Per record: passable, restricted, closed, conditional, conflicting or unknown, plus the routing action (block, do not block, manual review). |
 
@@ -62,8 +62,12 @@ both directions open.
   with a ~25 m bounding-box query to the OSM API.
 - **Matching** samples the record line and scores candidates read straight from the z14 vector tiles
   along the record (up to 150 tiles; the visible map does not move). z14 is the highest zoom of
-  OpenFreeMap, so these are the geometries the map shows. The score ranks candidates; it is not a
-  calibrated probability. When the best candidate is a merged tile feature, the viewer asks Overpass for the
+  OpenFreeMap, so these are the geometries the map shows. Score = coverage × quality: the quality of
+  the covered part (distance 0.3, direction 0.45, road number 0.15, class 0.1) multiplied by the
+  share of the record within 25 m. Ways join the explaining sequence on quality (≥ 0.6), so several
+  ways can share a long record. A merged tile feature ranks 0.1 lower than its score, so a single
+  OSM way within that margin wins; a runner-up on the same road (within 3 m) does not make the match
+  ambiguous. The score ranks candidates; it is not a calibrated probability. When the best candidate is a merged tile feature, the viewer asks Overpass for the
   ways with the same `highway` value (from the tile's road class) inside the part of the record that
   feature covers, and scores them in its place (up to 3 rounds). Boxes up to 500 × 500 m are asked
   from the OSM API first, then from Overpass. Larger boxes go to `overpass-api.de` first, then, up to
