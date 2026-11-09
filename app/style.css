@@ -686,3 +686,11 @@ body.dragging .dropzone {
   gap: 2px;
   vertical-align: middle;
 }
+
+/* Tiny OSM lane graphic in the matching candidate table. */
+.cand-lanes {
+  white-space: nowrap;
+}
+.lanes-tiny {
+  vertical-align: middle;
+}

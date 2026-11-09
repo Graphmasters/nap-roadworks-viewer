@@ -1,8 +1,11 @@
 // Explainable matching of a DATEX II line to OSM road candidates (concept §4.5, §5.4).
 //
-// The event line is sampled at regular steps. Each candidate is scored on how much of the line it
-// covers within a buffer, how close it is, whether the directions agree, and whether road number
-// and road class fit. The score is an internal ranking value, not a calibrated probability.
+// The event line is sampled at regular steps. Each candidate gets a quality for the part of the line
+// it covers (distance, direction, road number, road class) and a coverage (share of the line within
+// the buffer). score = coverage × quality, so a candidate that explains more of the line wins over a
+// short fragment that happens to lie exactly on it. Single OSM ways are preferred over merged tile
+// features (no reliable OSM id) unless the merged feature is clearly better. The score is an
+// internal ranking value, not a calibrated probability.
 
 import type { Geometry } from 'geojson'
 
@@ -19,6 +22,8 @@ export interface MatchCandidate {
   /** 1 = one-way along the geometry, -1 = against it, 0 / undefined = two-way. */
   oneway?: number
   lines: LonLat[][]
+  /** OSM tags, when the way was fetched (e.g. while splitting a merged feature). */
+  tags?: Record<string, string>
 }
 
 export interface MatchOptions {
@@ -43,6 +48,8 @@ export interface ScoredCandidate {
   components: ScoreComponents
   meanDistanceM?: number
   coveredSamples: number
+  /** Match quality of the covered part (0–1): weighted mean of distance, bearing, ref and class. */
+  quality: number
   /** Bounding box `[west, south, east, north]` of the event samples this candidate covers. */
   coveredBbox?: [number, number, number, number]
   reasons: string[]
@@ -62,7 +69,16 @@ export interface MatchResult {
   reasons: string[]
 }
 
-export const WEIGHTS: ScoreComponents = { coverage: 0.4, distance: 0.2, bearing: 0.25, ref: 0.1, roadClass: 0.05 }
+/** Weights of the quality components (sum 1). Coverage is not weighted: it multiplies the quality. */
+export const WEIGHTS: Omit<ScoreComponents, 'coverage'> = { distance: 0.3, bearing: 0.45, ref: 0.15, roadClass: 0.1 }
+/** A merged tile feature ranks this much lower, so a single OSM way within this margin wins. */
+export const MERGED_PENALTY = 0.1
+/** Minimum quality for a candidate to join the sequence or to make the match ambiguous. */
+export const MIN_QUALITY = 0.6
+/** A runner-up within this score of the best (and not on the same road) makes the match ambiguous. */
+export const AMBIGUITY_MARGIN = 0.12
+/** Two candidates whose nearest points are this close (mean, metres) are the same road. */
+const SAME_ROAD_M = 3
 
 interface Sample {
   x: number
@@ -127,9 +143,11 @@ function sampleLines(lines: Array<Array<[number, number]>>, maxSamples: number):
   return out
 }
 
-function nearest(px: number, py: number, lines: Array<Array<[number, number]>>): { d: number; bearing: number } {
+function nearest(px: number, py: number, lines: Array<Array<[number, number]>>): { d: number; bearing: number; x: number; y: number } {
   let best = Infinity
   let bearing = 0
+  let bx0 = px
+  let by0 = py
   for (const l of lines)
     for (let i = 1; i < l.length; i++) {
       const [ax, ay] = l[i - 1]!
@@ -142,9 +160,11 @@ function nearest(px: number, py: number, lines: Array<Array<[number, number]>>):
       if (d < best) {
         best = d
         bearing = bearingOf(ax, ay, bx, by)
+        bx0 = ax + t * dx
+        by0 = ay + t * dy
       }
     }
-  return { d: best, bearing }
+  return { d: best, bearing, x: bx0, y: by0 }
 }
 
 const normRef = (s: string) => s.toUpperCase().replace(/[\s.-]/g, '')
@@ -179,9 +199,12 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
 
   const classes = options.roadNumber ? expectedClasses(options.roadNumber) : undefined
   const coveredBy = new Map<string, Set<number>>()
+  /** Nearest point on each candidate per covered sample, to tell the same road from a parallel one. */
+  const nearestBy = new Map<string, Map<number, [number, number]>>()
   const ranked: ScoredCandidate[] = candidates.map((c) => {
     const lines = c.lines.map((l) => l.map(project))
     const covered = new Set<number>()
+    const near = new Map<number, [number, number]>()
     let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
     let dist = 0
     let bearing = 0
@@ -189,6 +212,7 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
       const n = nearest(s.x, s.y, lines)
       if (n.d > buffer) continue
       covered.add(s.index)
+      near.set(s.index, [n.x, n.y])
       minX = Math.min(minX, s.x)
       minY = Math.min(minY, s.y)
       maxX = Math.max(maxX, s.x)
@@ -200,6 +224,7 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
       bearing += Math.max(0, 1 - diff / 90)
     }
     coveredBy.set(c.key, covered)
+    nearestBy.set(c.key, near)
     const k = covered.size
     const components: ScoreComponents = {
       coverage: k / samples.length,
@@ -220,22 +245,40 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
       if (components.roadClass < 1) reasons.push(`Road class ${c.roadClass} is unusual for ${options.roadNumber}.`)
     }
     if (c.merged) reasons.push('Tile feature merged from several ways: the OSM id is only a hint.')
-    const score =
-      WEIGHTS.coverage * components.coverage +
-      WEIGHTS.distance * components.distance +
-      WEIGHTS.bearing * components.bearing +
-      WEIGHTS.ref * components.ref +
-      WEIGHTS.roadClass * components.roadClass
+    const quality = k
+      ? WEIGHTS.distance * components.distance + WEIGHTS.bearing * components.bearing + WEIGHTS.ref * components.ref + WEIGHTS.roadClass * components.roadClass
+      : 0
     const coveredBbox: ScoredCandidate['coveredBbox'] = k ? [...unproject(minX, minY), ...unproject(maxX, maxY)] : undefined
-    return { candidate: c, score: k ? score : 0, components, meanDistanceM: k ? dist / k : undefined, coveredSamples: k, coveredBbox, reasons }
+    return { candidate: c, score: components.coverage * quality, quality, components, meanDistanceM: k ? dist / k : undefined, coveredSamples: k, coveredBbox, reasons }
   })
-  ranked.sort((a, b) => b.score - a.score)
+  const rankKey = (r: ScoredCandidate) => r.score - (r.candidate.merged ? MERGED_PENALTY : 0)
+  ranked.sort((a, b) => rankKey(b) - rankKey(a) || b.score - a.score)
+  ranked.forEach((r, i) => {
+    if (!r.candidate.merged) return
+    const before = ranked.slice(0, i).find((x) => !x.candidate.merged && x.score < r.score)
+    if (before) r.reasons.push(`Ranked after ${before.candidate.key} (${before.score.toFixed(2)}) despite its higher score: single OSM ways are preferred over merged tile features within ${MERGED_PENALTY}.`)
+  })
+
+  /** True when both candidates lie on the same road where they overlap (e.g. a merged feature containing the way). */
+  const sameRoad = (a: ScoredCandidate, b: ScoredCandidate) => {
+    const na = nearestBy.get(a.candidate.key)!
+    const nb = nearestBy.get(b.candidate.key)!
+    let sum = 0
+    let n = 0
+    for (const [i, [ax, ay]] of na) {
+      const p = nb.get(i)
+      if (!p) continue
+      sum += Math.hypot(ax - p[0], ay - p[1])
+      n++
+    }
+    return n > 0 && sum / n < SAME_ROAD_M
+  }
 
   // Greedy sequence: accept candidates that explain new parts of the event.
   const used = new Set<number>()
   const sequence: ScoredCandidate[] = []
   for (const r of ranked) {
-    if (r.score < 0.45 || r.components.bearing < 0.5) continue
+    if (r.quality < MIN_QUALITY || r.components.bearing < 0.5) continue
     const cov = coveredBy.get(r.candidate.key)!
     let fresh = 0
     for (const i of cov) if (!used.has(i)) fresh++
@@ -258,7 +301,7 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
     reasons.push('No candidate explains a sufficient part of the event.')
   } else {
     // Ambiguity: a runner-up that is nearly as good and covers the same samples (parallel carriageway).
-    const second = ranked.find((r) => r !== top && r.score > top.score - 0.08 && r.score >= 0.45)
+    const second = ranked.find((r) => r !== top && r.score > top.score - AMBIGUITY_MARGIN && r.quality >= MIN_QUALITY && !sameRoad(top, r))
     if (second) {
       const a = coveredBy.get(top.candidate.key)!
       const b = coveredBy.get(second.candidate.key)!

@@ -273,3 +273,56 @@ describe('lane categories', async () => {
     expect(laneCategoriesOf([])).toEqual([])
   })
 })
+
+describe('matching preferences', async () => {
+  const { matchEvent, matchEventRefined } = await import('../src/index')
+  const line: Array<[number, number]> = [[10, 53.5], [10.01, 53.5]] // ~660 m eastwards
+  const dyM = (m: number) => m / 110_540
+  const seg = (x0: number, x1: number, dy: number): Array<[number, number]> => [[x0, 53.5 + dy], [x1, 53.5 + dy]]
+
+  it('prefers a candidate that covers more of the record over a short exact fragment', () => {
+    const full = { key: 'way/1', osmWayId: '1', lines: [seg(9.999, 10.011, dyM(18))] } // all of it, 18 m off
+    const part = { key: 'way/2', osmWayId: '2', lines: [seg(9.999, 10.007, 0)] } // 70 %, exactly on it
+    const m = matchEvent([line], [part, full])
+    expect(m.ranked[0]!.candidate.key).toBe('way/1')
+    expect(m.ranked[0]!.components.coverage).toBe(1)
+    expect(m.ranked[1]!.quality).toBeGreaterThan(m.ranked[0]!.quality) // the fragment fits better where it is
+    expect(m.ranked[0]!.score).toBeCloseTo(m.ranked[0]!.quality, 5) // score = coverage × quality
+  })
+
+  it('still chains several ways that each cover part of the record', () => {
+    const a = { key: 'way/3', osmWayId: '3', lines: [seg(9.999, 10.005, dyM(2))] }
+    const b = { key: 'way/4', osmWayId: '4', lines: [seg(10.005, 10.011, dyM(2))] }
+    const m = matchEvent([line], [a, b])
+    expect(m.status).toBe('matched')
+    expect(m.sequence.map((x) => x.candidate.key)).toEqual(['way/3', 'way/4'])
+    expect(m.coverage).toBe(1)
+  })
+
+  it('prefers a good single way over a slightly better merged feature, without a lookup', async () => {
+    const merged = { key: 'merged/9/primary', merged: true, roadClass: 'primary', lines: [seg(9.999, 10.011, dyM(3))] }
+    // The same road as a single way in another tile: identical geometry, covering 95 % of the record.
+    const single = { key: 'way/10', osmWayId: '10', roadClass: 'primary', lines: [seg(9.999, 10.0095, dyM(3))] }
+    let fetched = 0
+    const m = await matchEventRefined([line], [merged, single], async () => {
+      fetched++
+      return []
+    })
+    expect(m.ranked.map((x) => x.candidate.key)).toEqual(['way/10', 'merged/9/primary'])
+    expect(m.ranked[1]!.score).toBeGreaterThan(m.ranked[0]!.score)
+    expect(m.ranked[1]!.reasons.join(' ')).toMatch(/single OSM ways are preferred/)
+    expect(fetched).toBe(0)
+    // The merged feature lies on the same road, so the match is not ambiguous.
+    expect(m.status).toBe('matched')
+
+    // A clearly better merged feature still wins and is split into its ways.
+    const far = { key: 'way/11', osmWayId: '11', roadClass: 'primary', lines: [seg(9.999, 10.004, dyM(20))] }
+    const m2 = await matchEventRefined([line], [merged, far], async () => {
+      fetched++
+      return [{ id: '9', tags: { highway: 'primary', lanes: '2' }, geometry: seg(9.999, 10.011, dyM(3)) }]
+    })
+    expect(fetched).toBe(1)
+    expect(m2.ranked[0]!.candidate.key).toBe('way/9')
+    expect(m2.ranked[0]!.candidate.tags).toEqual({ highway: 'primary', lanes: '2' })
+  })
+})
