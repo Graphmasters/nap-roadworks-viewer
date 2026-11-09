@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { analyseDatex, extractText, isGzip, runChecks, sourceFromBytes } from '../src/index'
