@@ -13,6 +13,15 @@ plain or gzip-compressed. The file is processed in your browser and is not uploa
 The viewer is the Apache-2.0 base of the *NAP Roadworks Explorer* concept (NAPCORE Mobility Data
 Days 2026). A separate explorer will add routing on top of it. This repository has no routing code.
 
+![NAP Roadworks Viewer with Schleswig-Holstein roadworks: the record list on the left, the selected L 34 record on the map, and the Lanes tab comparing its DATEX II lane status with the OSM lane layout and way direction](docs/screenshot.webp)
+
+*A roadworks record on the L 34 near Garding. Lanes tab: the DATEX II lane status (`slw2xrF`: one
+lane closed, a reversible lane, the cycle path closed) next to the usual OSM layout of the matched
+way, with a compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr
+Schleswig-Holstein (LBV.SH)](https://mobilithek.info/offers/110000000003237002) via Mobilithek,
+licence-free. Map: © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap; style basemap.world /
+BKG (CC BY 4.0).*
+
 ## What it does
 
 | Step | What you get |
