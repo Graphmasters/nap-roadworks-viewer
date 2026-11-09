@@ -254,3 +254,22 @@ describe('tile reading', async () => {
     expect(tilesAlong([[[edgeLon, 52.5205], [edgeLon, 52.5206]]]).map(([x]) => x).sort()).toEqual([x0, x0 + 1])
   })
 })
+
+describe('lane categories', async () => {
+  const { laneCategoriesOf } = await import('../src/index')
+  it('classifies special lane configurations from MDM codes', () => {
+    expect(laneCategoriesOf(['w2x'])).toEqual(['reversible', 'closed'])
+    // Hard shoulder: the space outside a marking (right of r, left of l).
+    expect(laneCategoriesOf(['2xrx'])).toEqual(['hardShoulderClosed', 'closed'])
+    expect(laneCategoriesOf(['xlx2x'])).toEqual(['hardShoulderClosed', 'closed'])
+    expect(laneCategoriesOf(['2re'])).toEqual(['hardShoulderOpen', 'narrowed'])
+    expect(laneCategoriesOf(['wlu2orx'])).toEqual(['reversible', 'hardShoulderClosed', 'hardShoulderOpen', 'closed'])
+    // A plain hard shoulder (s) and lanes inside the markings are neither.
+    expect(laneCategoriesOf(['slu2ors'])).toEqual([])
+    expect(laneCategoriesOf(['p2P', 'H'])).toEqual(['parkingLane', 'parkingRestriction'])
+    expect(laneCategoriesOf([{ value: 'GFLx2xRFG' }])).toEqual(['closed', 'cyclewayClosed', 'footpathClosed'])
+    expect(laneCategoriesOf(['fgLx2x'])).toEqual(['closed', 'cyclewayOpen', 'footpathOpen'])
+    expect(laneCategoriesOf(['o 2 u'])).toEqual([])
+    expect(laneCategoriesOf([])).toEqual([])
+  })
+})

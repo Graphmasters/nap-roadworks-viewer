@@ -3,9 +3,10 @@
 
 import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
-import { compareLanes, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
+import { compareLanes, laneCategoriesOf, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
 import { append, badge, clear, dl, formatTime, h, link, spinner } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
+import { laneCategoryIcon } from './lane-icons'
 
 export type Tab = 'record' | 'xml' | 'lanes' | 'situation' | 'osm' | 'match'
 
@@ -215,6 +216,7 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
   const row = (x: RoadEvent) => {
     const p = r.recordPassability[x.id]
     const lane = x.laneCodes.find((c) => c.field === 'extendedLaneStatusCoded') ?? x.laneCodes[0]
+    const cats = laneCategoriesOf(x.laneCodes)
     return h(
       'li',
       { class: x.id === e.id ? 'current' : '' },
@@ -223,6 +225,7 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
       h('span', { class: 'muted' }, x.recordType ?? ''),
       x.managementTypes.length ? ` · ${x.managementTypes.join(', ')}` : '',
       lane ? [' · ', h('code', null, lane.value)] : '',
+      cats.length ? [' ', h('span', { class: 'lane-icons' }, ...cats.map((c) => laneCategoryIcon(c, 14, { title: true })))] : '',
       ' ',
       p ? badge(PASS_LABEL[p.classification], `pass-${p.classification}`) : null,
       x.causeRecordIds.length ? h('div', { class: 'muted' }, `└ cause record → ${x.causeRecordIds.join(', ')}`) : null,

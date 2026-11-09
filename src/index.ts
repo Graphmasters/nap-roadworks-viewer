@@ -13,6 +13,7 @@ export {
   oneSideFullyClosed,
   type LaneCodeSummary,
 } from './lanes/codes'
+export { LANE_CATEGORIES, laneCategoriesOf, type LaneCategory, type LaneCategorySpec } from './lanes/categories'
 export { compareLanes, osmLaneAttributes, type LaneComparison, type LaneIndicator, type OsmLaneAttributes } from './lanes/compare'
 export { analysePassability, reportsFullClosure, passabilityToFinding, type PassabilityOutput } from './passability/classify'
 export { PROFILES, detectProfile, profileById, type Profile, type ProfileContext } from './validation/profiles'
