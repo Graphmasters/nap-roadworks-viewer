@@ -299,6 +299,15 @@ describe('matching preferences', async () => {
     expect(m.coverage).toBe(1)
   })
 
+  it('matches a record shorter than one sampling step', () => {
+    const short: Array<[number, number]> = [[10, 53.5], [10.00012, 53.5]] // ~8 m
+    const way = { key: 'way/12', osmWayId: '12', lines: [seg(9.999, 10.001, dyM(2))] }
+    const m = matchEvent([short], [way])
+    expect(m.samples).toBe(2)
+    expect(m.status).toBe('matched')
+    expect(m.sequence.map((x) => x.candidate.key)).toEqual(['way/12'])
+  })
+
   it('prefers a good single way over a slightly better merged feature, without a lookup', async () => {
     const merged = { key: 'merged/9/primary', merged: true, roadClass: 'primary', lines: [seg(9.999, 10.011, dyM(3))] }
     // The same road as a single way in another tile: identical geometry, covering 95 % of the record.

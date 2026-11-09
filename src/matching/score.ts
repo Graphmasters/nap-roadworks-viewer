@@ -139,6 +139,10 @@ function sampleLines(lines: Array<Array<[number, number]>>, maxSamples: number):
       }
       carry = d - seg
     }
+    // Always sample the end of the line too, so a line shorter than one step gets two samples.
+    const end = l[l.length - 1]!
+    const last = out[out.length - 1]
+    if (l.length > 1 && last && Math.hypot(end[0] - last.x, end[1] - last.y) > 1) out.push({ x: end[0], y: end[1], bearing: last.bearing, index: out.length })
   }
   return out
 }
@@ -282,7 +286,8 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
     const cov = coveredBy.get(r.candidate.key)!
     let fresh = 0
     for (const i of cov) if (!used.has(i)) fresh++
-    if (fresh < Math.max(2, samples.length * 0.05)) continue
+    // A very short record may have a single sample; covering all of it is enough.
+    if (fresh < Math.min(samples.length, Math.max(2, samples.length * 0.05))) continue
     sequence.push(r)
     for (const i of cov) used.add(i)
   }

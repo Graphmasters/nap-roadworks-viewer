@@ -4,7 +4,7 @@
 import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
 import { compareLanes, laneCategoriesOf, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
-import { append, badge, clear, dl, formatTime, h, link, spinner } from './dom'
+import { append, badge, clear, dl, formatTime, h, link, spinner, type Child } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
 
@@ -279,6 +279,7 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
     h(
       'tr',
       null,
+      h('th', null, ''),
       h('th', null, 'Candidate'),
       h('th', { title: 'coverage × quality' }, 'Score'),
       h('th', { title: 'Share of the record within 25 m; multiplies the quality' }, 'Cov.'),
@@ -287,9 +288,10 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
       h('th', { title: `weight ${WEIGHTS.bearing} in the quality` }, 'Dir.'),
       h('th', { title: `weight ${WEIGHTS.ref} in the quality` }, 'Ref'),
       h('th', { title: 'OSM lanes (osm-lanes), once the way has been loaded' }, 'Lanes'),
-      h('th', null, ''),
     ),
   )
+  // Candidate keys break after each "/" so the table fits the side panel.
+  const keyText = (key: string): Child[] => key.split('/').flatMap((p, i, a) => (i < a.length - 1 ? [`${p}/`, h('wbr')] : [p]))
   const seq = new Set(m.sequence.map((x) => x.candidate.key))
   for (const r of m.ranked.slice(0, 15)) {
     const c = r.candidate
@@ -298,7 +300,8 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
       h(
         'tr',
         { class: seq.has(c.key) ? 'chosen' : '', title: r.reasons.join('\n') },
-        h('td', null, c.osmWayId ? link(`https://www.openstreetmap.org/way/${c.osmWayId}`, c.key) : h('span', { class: 'muted' }, c.key), h('div', { class: 'muted' }, [c.roadClass, c.ref].filter(Boolean).join(' · '))),
+        h('td', null, h('button', { type: 'button', class: s.confirmedKey === c.key ? 'active' : '', title: c.merged ? 'Merged tile feature: the way is looked up by location in the OSM API' : '', onclick: () => cb.chooseCandidate(c.key, c.osmWayId) }, s.confirmedKey === c.key ? 'selected' : 'use')),
+        h('td', { class: 'cand-key' }, c.osmWayId ? link(`https://www.openstreetmap.org/way/${c.osmWayId}`, keyText(c.key)) : h('span', { class: 'muted' }, keyText(c.key)), h('div', { class: 'muted' }, [c.roadClass, c.ref].filter(Boolean).join(' · '))),
         h('td', null, r.score.toFixed(2)),
         h('td', null, pct(r.components.coverage)),
         h('td', null, pct(r.quality)),
@@ -306,11 +309,10 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
         h('td', null, pct(r.components.bearing)),
         h('td', null, r.components.ref === 0.5 ? '–' : pct(r.components.ref)),
         h('td', { class: 'cand-lanes' }, candidateLanes(c.tags ?? (c.osmWayId ? s.ways?.get(c.osmWayId)?.tags : undefined))),
-        h('td', null, h('button', { type: 'button', class: s.confirmedKey === c.key ? 'active' : '', title: c.merged ? 'Merged tile feature: the way is looked up by location in the OSM API' : '', onclick: () => cb.chooseCandidate(c.key, c.osmWayId) }, s.confirmedKey === c.key ? 'selected' : 'use')),
       ),
     )
   }
-  append(el, table, h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison; the Lanes column shows the OSM lanes of every way loaded so far (· not loaded, – no lane tags). merged/… candidates are tile features merged from several ways.'))
+  append(el, h('div', { class: 'table-scroll' }, table), h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison; the Lanes column shows the OSM lanes of every way loaded so far (· not loaded, – no lane tags). merged/… candidates are tile features merged from several ways.'))
 }
 
 /** Tiny OSM lane graphic for the candidate table, or a dash when the way's tags are not loaded. */
