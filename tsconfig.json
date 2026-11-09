@@ -14,11 +14,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@graphmasters/osm-lanes": ["vendor/osm-lanes/src/index.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src", "test", "app"]
 }

@@ -11,6 +11,8 @@
   --error: #c8102e;
   --select: #e8f0fe;
   --code-bg: #f0f2f4;
+  /* Background behind osm-lanes graphics, which use fixed light-theme colours. */
+  --graphic-bg: transparent;
   color-scheme: light dark;
 }
 
@@ -28,6 +30,7 @@
     --error: #ff6b6b;
     --select: #233249;
     --code-bg: #2b3138;
+    --graphic-bg: #f5f6f8;
   }
 }
 
@@ -642,4 +645,18 @@ body.dragging .dropzone {
   .spinner {
     animation-duration: 2.4s;
   }
+}
+
+/* OSM lane graphic with the osm-lanes compass rose (way direction) beside it. */
+.lanes-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lanes-row .osml-compass {
+  flex: none;
+  /* Its bearing text is dark grey; give it a light card in dark mode so it stays readable. */
+  background: var(--graphic-bg);
+  border-radius: 8px;
 }

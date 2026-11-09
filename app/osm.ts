@@ -1,7 +1,7 @@
 // OSM API helpers. Tile features merged from several ways carry no usable way id; for those the
 // way under the pointer is found with a small bounding-box query (`/api/0.6/map.json`).
 
-import { DEFAULT_OSM_API_BASE_URL, DEFAULT_OVERPASS_ENDPOINT, type OsmWay } from '@graphmasters/osm-lanes'
+import { DEFAULT_OSM_API_BASE_URL, DEFAULT_OVERPASS_ENDPOINT, type OsmWay } from 'osm-lanes'
 import type { Bbox, HighwayWay } from '../src/index'
 
 interface ApiNode {

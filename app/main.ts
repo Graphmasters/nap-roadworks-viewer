@@ -1,4 +1,4 @@
-import { fetchWayFromOsmApi, type OsmWay } from '@graphmasters/osm-lanes'
+import { fetchWayFromOsmApi, type OsmWay } from 'osm-lanes'
 import { linesOf, matchEventRefined, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
 import { formatBytes } from './dom'
 import { fetchHighwaysInBbox, fetchHighwaysNear, nearestWay } from './osm'

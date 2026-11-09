@@ -3,7 +3,8 @@ Copyright 2026 Graphmasters GmbH
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
-It bundles third-party software under their own licences:
+It uses third-party software under their own licences (dependencies of the
+library, installed from npm; bundled into the demo application):
 
   * osm-lanes (Apache-2.0), Copyright 2026 Graphmasters GmbH, which itself
     includes Pinhead icons (CC0 1.0) and German road-sign images (public domain

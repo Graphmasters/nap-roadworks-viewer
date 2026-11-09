@@ -3,11 +3,11 @@
 The source code of nap-roadworks-viewer is licensed under the Apache License 2.0 (see
 [LICENSE](LICENSE)). The following components and services are used under their own terms.
 
-## Software bundled in the library (`dist/`)
+## Runtime dependencies of the library (installed from npm)
 
 | Component | Licence | Use |
 |---|---|---|
-| [osm-lanes](https://github.com/Graphmasters/osm-lanes) (git submodule, pinned commit) | Apache-2.0 | OSM lane interpretation and SVG, tile feature id decoding, OSM API client. Includes Pinhead icons (CC0 1.0) and German road-sign images (public domain, § 5 UrhG); see its [ATTRIBUTION.md](https://github.com/Graphmasters/osm-lanes/blob/main/ATTRIBUTION.md). |
+| [osm-lanes](https://github.com/Graphmasters/osm-lanes) ([npm](https://www.npmjs.com/package/osm-lanes)) | Apache-2.0 | OSM lane interpretation and SVG, tile feature id decoding, OSM API client. Includes Pinhead icons (CC0 1.0) and German road-sign images (public domain, § 5 UrhG); see its [ATTRIBUTION.md](https://github.com/Graphmasters/osm-lanes/blob/main/ATTRIBUTION.md). |
 | [lane-status-viewer](https://github.com/Graphmasters/lane-status-viewer) | MIT | Decoding and drawing MDM `laneStatusCoded` / `extendedLaneStatusCoded`. |
 | [saxes](https://github.com/lddubeau/saxes) | ISC | Streaming XML parser. |
 

@@ -26,7 +26,7 @@ Days 2026). A separate explorer will add routing on top of it. This repository h
 | **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line (coverage, distance, direction, road number, class), shows the components, and reports *ambiguous* or *no match*. A merged tile feature that wins is split into its OSM ways via Overpass and scored again. |
-| **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. |
+| **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
 | **Passability** | Per record: passable, restricted, closed, conditional, conflicting or unknown, plus the routing action (block, do not block, manual review). |
 
 ### DQ-RW-001: closure that contradicts its cause
@@ -115,7 +115,7 @@ character offsets), `summariseLaneCode`, `compareLanes`, `osmLaneAttributes` and
 ## Development
 
 ```sh
-git clone --recurse-submodules https://github.com/Graphmasters/nap-roadworks-viewer.git
+git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
 npm ci
 npm run dev          # http://localhost:5173/nap-roadworks-viewer/
 npm test             # Vitest, synthetic DATEX II fixtures in test/fixtures.ts
@@ -124,9 +124,8 @@ npm run build        # library → dist/
 npm run build:app    # GitHub Pages site → _site/
 ```
 
-[osm-lanes](https://github.com/Graphmasters/osm-lanes) is not on npm yet. It is a git submodule
-pinned to a commit (`vendor/osm-lanes`) and bundled into the library and the app. Run
-`git submodule update --init` if you cloned without `--recurse-submodules`.
+Lane interpretation, tile feature ids and the OSM API client come from the
+[osm-lanes](https://www.npmjs.com/package/osm-lanes) npm package.
 
 The repository contains no real feed data. Tests use small, hand-written XML documents.
 

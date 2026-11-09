@@ -1,7 +1,7 @@
 // Right panel: context-sensitive inspector with tabs for the record, its XML, lanes, the
 // situation (passability), the selected OSM way and matching.
 
-import { renderLanesElement, wikiUrlForKey, type OsmWay } from '@graphmasters/osm-lanes'
+import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
 import { compareLanes, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
 import { append, badge, clear, dl, formatTime, h, link, spinner } from './dom'
@@ -181,10 +181,9 @@ function renderLanes(el: HTMLElement, s: InspectorState, e: RoadEvent) {
     return
   }
   const way = s.way.value
-  const osmSvg = renderLanesElement(way.tags, { showSigns: false })
   append(el, 
     h('p', null, link(`https://www.openstreetmap.org/way/${way.id}`, `way/${way.id}`), way.tags['ref'] ? ` · ${way.tags['ref']}` : '', way.tags['name'] ? ` · ${way.tags['name']}` : ''),
-    osmSvg ? h('figure', { class: 'lane-fig' }, osmSvg, h('figcaption', null, 'Usual layout according to OSM (osm-lanes)')) : h('p', { class: 'muted' }, 'No lane diagram for this way.'),
+    osmLaneFigure(way, { showSigns: false, caption: 'Usual layout according to OSM (osm-lanes), in way direction' }) ?? h('p', { class: 'muted' }, 'No lane diagram for this way.'),
   )
   const matched = s.match.status === 'done' ? s.match.value.ranked.find((r) => r.candidate.osmWayId === way.id || r.candidate.key === s.confirmedKey) : undefined
   const cmp = compareLanes(e, osmLaneAttributes('way', way.id, way.tags), matched?.score)
@@ -293,6 +292,23 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
   append(el, table, h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison. merged/… candidates are tile features merged from several ways. When one is the best candidate, its OSM ways of the same road class are fetched from Overpass and scored in its place.'))
 }
 
+/**
+ * The OSM lane graphic with a compass rose beside it. osm-lanes draws lanes in the way's drawing
+ * direction ("up"); the compass shows where that points, and the map highlight carries matching
+ * arrows. Without lanes to draw, the compass is shown alone; without geometry, nothing.
+ */
+function osmLaneFigure(way: OsmWay, opts: { showSigns?: boolean; caption: string }): HTMLElement | null {
+  const lanes = renderLanesElement(way, { showSigns: opts.showSigns })
+  const compass = renderCompassElement(wayBearing(way.geometry))
+  if (!lanes && !compass) return null
+  return h(
+    'figure',
+    { class: 'lane-fig' },
+    h('div', { class: 'lanes-row' }, lanes, compass),
+    h('figcaption', null, lanes ? `${opts.caption}${compass ? '; compass and map arrows show that direction' : ''}` : 'Way direction (no lanes to draw; map arrows show the same direction)'),
+  )
+}
+
 function renderOsm(el: HTMLElement, s: InspectorState, e: RoadEvent | undefined) {
   const busy = osmBusy(s)
   if (busy || s.way.status === 'loading') {
@@ -309,12 +325,13 @@ function renderOsm(el: HTMLElement, s: InspectorState, e: RoadEvent | undefined)
   }
   const way = s.way.value
   const t = way.tags
-  const svg = renderLanesElement(t)
+  const dest = renderDestinationSignElement(way)
   append(el, 
     h('h2', null, t['name'] || t['ref'] || `Way ${way.id}`),
     h('p', null, link(`https://www.openstreetmap.org/way/${way.id}`, `way/${way.id}`), way.version ? ` · version ${way.version}` : '', way.timestamp ? ` · edited ${formatTime(way.timestamp)}` : '', prov('OSM API')),
     h('p', { class: 'muted' }, 'Tags come from the live OSM API; the map tiles may be older.'),
-    svg ? h('figure', { class: 'lane-fig' }, svg, h('figcaption', null, 'Lanes (osm-lanes)')) : null,
+    dest ? h('figure', { class: 'lane-fig' }, dest, h('figcaption', null, 'Destination sign (destination:lanes)')) : null,
+    osmLaneFigure(way, { caption: 'Lanes in way direction (osm-lanes)' }),
   )
   const rows = Object.keys(t)
     .sort()
