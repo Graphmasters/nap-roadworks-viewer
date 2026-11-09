@@ -2,12 +2,18 @@
 // lets the user pick OSM roads (tile feature id → OSM way) and collects road candidates for
 // matching.
 
-import maplibregl, { type GeoJSONSource, type MapGeoJSONFeature } from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import type { GeoJSONSource, MapGeoJSONFeature } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { decodeTileFeatureId, type OsmWay } from 'osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
 import type { LonLat, MatchResult, RecordPassability, RoadEvent } from '../src/index'
 import { readRoadCandidates, type TileRead } from './tiles'
+
+// MapLibre 6 resolves its worker file at runtime, which bundlers cannot follow; hand it the
+// worker URL that Vite emits instead.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 export const STYLE_BASE = 'https://graphmasters.github.io/basemap-world-openfreemap'
 export const STYLE_URL = `${STYLE_BASE}/style.json`
