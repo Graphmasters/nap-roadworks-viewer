@@ -1,3 +1,0 @@
-[submodule "vendor/osm-lanes"]
-	path = vendor/osm-lanes
-	url = https://github.com/Graphmasters/osm-lanes.git

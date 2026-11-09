@@ -4,7 +4,7 @@
 // geometry the map can show. Tiles are fetched over HTTP (shared with the map through the browser
 // cache) and decoded with @mapbox/vector-tile, the decoder MapLibre itself uses.
 
-import { decodeTileFeatureId } from '@graphmasters/osm-lanes'
+import { decodeTileFeatureId } from 'osm-lanes'
 import { VectorTile } from '@mapbox/vector-tile'
 import Pbf from 'pbf'
 import type { LonLat, MatchCandidate } from '../src/index'

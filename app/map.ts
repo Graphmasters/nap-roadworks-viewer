@@ -4,7 +4,7 @@
 
 import maplibregl, { type GeoJSONSource, type MapGeoJSONFeature } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { decodeTileFeatureId, type OsmWay } from '@graphmasters/osm-lanes'
+import { decodeTileFeatureId, type OsmWay } from 'osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
 import type { LonLat, MatchResult, RecordPassability, RoadEvent } from '../src/index'
 import { readRoadCandidates, type TileRead } from './tiles'
@@ -33,6 +33,35 @@ const ROAD_CLASSES = new Set([
   'minor_construction',
   'service_construction',
 ])
+
+const DIRECTION_ICON = 'nrv-way-direction'
+
+/**
+ * A chevron pointing right (+x), drawn on a canvas so the style needs no sprite. Symbols placed
+ * along a line turn +x into the line direction, so the chevrons follow the way's node order.
+ * Same design as the osm-lanes demo; dark blue to match the way highlight.
+ */
+function directionIcon(): ImageData {
+  const px = 48
+  const ctx = document.createElement('canvas').getContext('2d')!
+  ctx.canvas.width = ctx.canvas.height = px
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  const chevron = () => {
+    ctx.beginPath()
+    ctx.moveTo(px * 0.32, px * 0.18)
+    ctx.lineTo(px * 0.68, px * 0.5)
+    ctx.lineTo(px * 0.32, px * 0.82)
+    ctx.stroke()
+  }
+  ctx.strokeStyle = '#0b3d91'
+  ctx.lineWidth = px * 0.26
+  chevron()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = px * 0.14
+  chevron()
+  return ctx.getImageData(0, 0, px, px)
+}
 
 export const TYPE_COLORS: Record<RoadEvent['type'], string> = {
   fullClosure: '#c8102e',
@@ -165,6 +194,23 @@ export class RoadworksMap {
       source: WAY,
       paint: { 'line-color': '#1a73e8', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 4, 18, 10] },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
+    })
+    // Chevrons along the selected way show its drawing direction: "up" in the osm-lanes graphic,
+    // and the direction the compass rose in the Lanes and OSM tabs points to.
+    if (!this.map.hasImage(DIRECTION_ICON)) this.map.addImage(DIRECTION_ICON, directionIcon(), { pixelRatio: 2 })
+    this.map.addLayer({
+      id: `${WAY}-direction`,
+      type: 'symbol',
+      source: WAY,
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 10, 50, 14, 70, 18, 140],
+        'icon-image': DIRECTION_ICON,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 0.7, 18, 1.3],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+      },
     })
     this.updateHint()
   }

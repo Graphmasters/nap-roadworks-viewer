@@ -2,7 +2,7 @@
 // (concept §4.6, §5.5). DATEX II describes a temporary state; OSM describes the usual layout, so
 // a difference is a hint to look closer, not an error.
 
-import { interpretLanes } from '@graphmasters/osm-lanes'
+import { interpretLanes } from 'osm-lanes'
 import type { RoadEvent, Severity } from '../model'
 import { laneEvidenceOf, type LaneCodeSummary } from './codes'
 
