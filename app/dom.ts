@@ -63,3 +63,8 @@ export function dl(rows: Array<[string, Child]>, cls = 'kv'): HTMLDListElement {
 export function badge(text: string, kind: string): HTMLSpanElement {
   return h('span', { class: `badge ${kind}` }, text)
 }
+
+/** A status line with a spinner, for waits on the network (Overpass, OSM API). */
+export function spinner(text: string): HTMLElement {
+  return h('p', { class: 'loading', role: 'status', 'aria-live': 'polite' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), text)
+}

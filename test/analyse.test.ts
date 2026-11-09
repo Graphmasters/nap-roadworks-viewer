@@ -191,4 +191,48 @@ describe('lane comparison and matching', async () => {
     expect(reverse.status).toBe('none')
     expect(matchEvent([line], []).status).toBe('none')
   })
+
+  it('splits a merged top candidate into OSM ways of its road class', async () => {
+    const { matchEventRefined, highwayValuesFor } = await import('../src/index')
+    expect(highwayValuesFor('motorway')).toEqual(['motorway'])
+    expect(highwayValuesFor('primary_link')).toEqual(['primary_link'])
+    expect(highwayValuesFor('minor')).toContain('residential')
+    expect(highwayValuesFor('trunk_construction')).toEqual(['construction'])
+    expect(highwayValuesFor('path')).toBeUndefined()
+
+    const line: Array<[number, number]> = [[10, 53.5], [10.01, 53.5]]
+    const off = (dy: number, x0 = 9.999, x1 = 10.011): Array<[number, number]> => [[x0, 53.5 + dy], [x1, 53.5 + dy]]
+    // A dual carriageway merged into one tile feature (its id names only the first way), far beyond the record.
+    const merged = { key: 'merged/7/motorway', merged: true, roadClass: 'motorway', oneway: 0, lines: [off(0.00005, 9.9, 10.1), off(-0.00005, 9.9, 10.1)] }
+    const calls: Array<{ bbox: number[]; highways: string[] }> = []
+    const r = await matchEventRefined([line], [merged], async (bbox, highways) => {
+      calls.push({ bbox, highways })
+      return [
+        { id: '7', tags: { highway: 'motorway', ref: 'A 1' }, geometry: [...off(-0.00005)].reverse(), source: 'OSM API' }, // opposite carriageway
+        { id: '8', tags: { highway: 'motorway', ref: 'A 1' }, geometry: off(0.00005), source: 'OSM API' },
+      ]
+    }, { roadNumber: 'A1' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.highways).toEqual(['motorway'])
+    // Only the covered part of the record is queried, not the whole merged feature.
+    expect(calls[0]!.bbox[0]).toBeGreaterThan(9.99)
+    expect(calls[0]!.bbox[2]).toBeLessThan(10.02)
+    expect(r.status).toBe('matched')
+    expect(r.sequence.map((x) => x.candidate.key)).toEqual(['way/8'])
+    expect(r.refinements).toEqual([expect.objectContaining({ key: 'merged/7/motorway', ways: 2 })])
+    expect(r.reasons[0]).toMatch(/replaced by 2 OSM way.* from OSM API/)
+    expect(r.refinements[0]!.source).toBe('OSM API')
+
+    // Ways already known as single-way candidates get the full geometry; the merged feature still goes.
+    const partial = { key: 'way/8', osmWayId: '8', roadClass: 'motorway', oneway: 1, lines: [off(0.00005, 10.008, 10.011)] }
+    const known = await matchEventRefined([line], [merged, partial], async () => [{ id: '8', tags: { highway: 'motorway' }, geometry: off(0.00005) }])
+    expect(known.ranked.map((x) => x.candidate.key)).toEqual(['way/8'])
+    expect(known.sequence[0]!.components.coverage).toBe(1)
+
+    const failed = await matchEventRefined([line], [merged], async () => {
+      throw new Error('Overpass answered 504')
+    })
+    expect(failed.sequence[0]!.candidate.key).toBe('merged/7/motorway')
+    expect(failed.refinements[0]!.error).toMatch(/504/)
+  })
 })
