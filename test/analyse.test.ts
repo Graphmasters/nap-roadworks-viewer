@@ -172,6 +172,10 @@ describe('lane comparison and matching', async () => {
     expect(differs.indicators.some((i) => i.id === 'count-differs')).toBe(true)
     const none = compareLanes(e, osmLaneAttributes('way', '1', { highway: 'secondary' }))
     expect(none.assessment).toBe('OSM has no lane count to compare with')
+    const tags = { highway: 'primary', lanes: '3', 'lanes:forward': '2', 'lanes:backward': '1' }
+    const reversed = osmLaneAttributes('way', '1', tags, { reverse: true })
+    expect([reversed.lanesForward, reversed.lanesBackward, reversed.interpretedForward, reversed.interpretedBackward]).toEqual([1, 2, 1, 2])
+    expect(osmLaneAttributes('way', '1', { highway: 'primary', oneway: 'yes', lanes: '2' }, { reverse: true }).oneWay).toBe(true)
   })
 
   it('matches a line to the closest parallel road and flags ambiguity', () => {
@@ -191,6 +195,19 @@ describe('lane comparison and matching', async () => {
     const reverse = matchEvent([line], [{ key: 'way/4', osmWayId: '4', oneway: 1, lines: [[...off(0.00005)].reverse()] }])
     expect(reverse.status).toBe('none')
     expect(matchEvent([line], []).status).toBe('none')
+  })
+
+  it('tells whether a record runs with or against a way', async () => {
+    const { recordWayOrientation } = await import('../src/index')
+    const line: Array<[number, number]> = [[10, 53.5], [10.01, 53.5]]
+    const way: Array<[number, number]> = [[9.999, 53.50005], [10.005, 53.50005], [10.011, 53.50005]]
+    expect(recordWayOrientation([line], way)).toBe(1)
+    expect(recordWayOrientation([line], [...way].reverse())).toBe(-1)
+    // only the part near the way counts
+    expect(recordWayOrientation([[[10.02, 53.5], [10.01, 53.5], [10.005, 53.5]]], way)).toBe(-1)
+    expect(recordWayOrientation([line], [[10.005, 53.499], [10.005, 53.501]])).toBe(0)
+    expect(recordWayOrientation([line], [[9.999, 53.51], [10.011, 53.51]])).toBe(0)
+    expect(recordWayOrientation([line], [[10, 53.5]])).toBe(0)
   })
 
   it('splits a merged top candidate into OSM ways of its road class', async () => {
