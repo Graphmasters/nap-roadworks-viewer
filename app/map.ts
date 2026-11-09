@@ -6,7 +6,8 @@ import maplibregl, { type GeoJSONSource, type MapGeoJSONFeature } from 'maplibre
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { decodeTileFeatureId, type OsmWay } from '@graphmasters/osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
-import type { LonLat, MatchCandidate, MatchResult, RecordPassability, RoadEvent } from '../src/index'
+import type { LonLat, MatchResult, RecordPassability, RoadEvent } from '../src/index'
+import { readRoadCandidates, type TileRead } from './tiles'
 
 export const STYLE_BASE = 'https://graphmasters.github.io/basemap-world-openfreemap'
 export const STYLE_URL = `${STYLE_BASE}/style.json`
@@ -58,7 +59,6 @@ const CANDIDATES = 'nrv-candidates'
 export class RoadworksMap {
   readonly map: maplibregl.Map
   private roadLayers: string[] = []
-  private nameLayers: string[] = []
   private mode: MapMode = 'records'
   private selected: number | null = null
   private ready: Promise<void>
@@ -92,7 +92,6 @@ export class RoadworksMap {
     const style = this.map.getStyle()
     const transport = style.layers.filter((l) => l.type === 'line' && 'source-layer' in l && l['source-layer'] === 'transportation')
     this.roadLayers = transport.map((l) => l.id)
-    this.nameLayers = style.layers.filter((l) => 'source-layer' in l && l['source-layer'] === 'transportation_name').map((l) => l.id)
 
     const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
     this.map.addSource(WAY, { type: 'geojson', data: empty })
@@ -297,83 +296,23 @@ export class RoadworksMap {
    * visited viewport by viewport at zoom 15. Tile features merged from several ways keep a
    * `merged/…` key: their id only hints at the first merged way.
    */
-  async collectCandidates(lines: LonLat[][], onStatus: (s: string) => void, signal: AbortSignal): Promise<{ candidates: MatchCandidate[]; viewports: number; truncated: boolean }> {
+  /**
+   * Road candidates near the record, read from the z14 vector tiles of the road source. The
+   * visible map does not move.
+   */
+  async collectCandidates(lines: LonLat[][], onStatus: (s: string) => void, signal: AbortSignal): Promise<TileRead> {
     await this.ready
-    const all = lines.flat()
-    const bounds = new maplibregl.LngLatBounds()
-    for (const c of all) bounds.extend(c)
-    const pad = 0.0006
-    const box = { w: bounds.getWest() - pad, e: bounds.getEast() + pad, s: bounds.getSouth() - pad, n: bounds.getNorth() + pad }
-    const before = { center: this.map.getCenter(), zoom: this.map.getZoom() }
-    const cam = this.map.cameraForBounds(bounds, { padding: 60 })
-    const centers: maplibregl.LngLat[] = []
-    let zoom = 15
-    if (cam && cam.zoom !== undefined && cam.zoom >= MIN_SELECT_ZOOM + 0.5) {
-      centers.push(maplibregl.LngLat.convert(cam.center!))
-      zoom = Math.min(cam.zoom, 17)
-    } else {
-      // Step along the line; one viewport at z15 covers roughly the container size in pixels.
-      const canvas = this.map.getCanvas()
-      const mPerPx = (156543.03 * Math.cos((bounds.getCenter().lat * Math.PI) / 180)) / 2 ** 15
-      const step = Math.min(canvas.clientWidth, canvas.clientHeight) * mPerPx * 0.7
-      for (const l of lines) {
-        let acc = step
-        for (let i = 0; i < l.length; i++) {
-          if (i > 0) acc += distM(l[i - 1]!, l[i]!)
-          if (acc >= step || i === l.length - 1) {
-            centers.push(new maplibregl.LngLat(l[i]![0], l[i]![1]))
-            acc = 0
-          }
-        }
-      }
-    }
-    const MAX = 20
-    const truncated = centers.length > MAX
-    const visit = truncated ? centers.filter((_, i) => i % Math.ceil(centers.length / MAX) === 0) : centers
-    const byKey = new Map<string, MatchCandidate>()
-    const refs = new Map<string, string>()
-    for (let k = 0; k < visit.length; k++) {
-      if (signal.aborted) break
-      onStatus(`Reading road features ${k + 1}/${visit.length}…`)
-      this.map.jumpTo({ center: visit[k]!, zoom })
-      await idle(this.map)
-      for (const f of this.map.queryRenderedFeatures({ layers: this.nameLayers })) {
-        const d = decodeTileFeatureId(f.id)
-        const ref = f.properties['ref']
-        if (d.kind === 'element' && ref) refs.set(d.id, String(ref))
-      }
-      for (const f of this.map.queryRenderedFeatures({ layers: this.roadLayers })) {
-        const cls = String(f.properties['class'])
-        if (!ROAD_CLASSES.has(cls)) continue
-        const g = f.geometry
-        const parts = g.type === 'LineString' ? [g.coordinates as LonLat[]] : g.type === 'MultiLineString' ? (g.coordinates as LonLat[][]) : []
-        const inBox = parts.filter((p) => p.some(([x, y]) => x >= box.w && x <= box.e && y >= box.s && y <= box.n))
-        if (!inBox.length) continue
-        const d = decodeTileFeatureId(f.id)
-        let key: string
-        let wayId: string | undefined
-        let merged = false
-        if (d.kind === 'element' && d.type === 'way') {
-          key = `way/${d.id}`
-          wayId = d.id
-        } else if (d.kind === 'merged') {
-          key = `merged/${d.hintWayId}/${cls}`
-          merged = true
-        } else continue
-        let c = byKey.get(key)
-        if (!c) {
-          const oneway = Number(f.properties['oneway'] ?? 0)
-          byKey.set(key, (c = { key, osmWayId: wayId, merged, roadClass: cls + (f.properties['ramp'] ? '_link' : ''), oneway: Number.isFinite(oneway) ? oneway : 0, lines: [] }))
-        }
-        c.lines.push(...inBox)
-      }
-    }
-    for (const c of byKey.values()) if (c.osmWayId && refs.has(c.osmWayId)) c.ref = refs.get(c.osmWayId)
-    this.map.jumpTo(before)
-    const b = new maplibregl.LngLatBounds()
-    for (const c of all) b.extend(c)
-    this.map.fitBounds(b, { padding: 80, maxZoom: 17, duration: 0 })
-    return { candidates: [...byKey.values()], viewports: visit.length, truncated }
+    const template = this.roadTileTemplate()
+    if (!template) throw new Error('The map style has no vector tile source for roads.')
+    return readRoadCandidates(lines, template, { roadClasses: ROAD_CLASSES, signal, onStatus })
+  }
+
+  /** Tile URL template of the source behind the `transportation` layers (resolved from its TileJSON). */
+  private roadTileTemplate(): string | undefined {
+    const layer = this.roadLayers.map((id) => this.map.getLayer(id)).find(Boolean)
+    const source = layer && 'source' in layer ? this.map.getSource(String(layer.source)) : undefined
+    const tiles = (source as { tiles?: string[] } | undefined)?.tiles
+    return tiles?.[0]
   }
 }
 
@@ -391,17 +330,3 @@ function coordsOf(e: RoadEvent): number[][] {
   return []
 }
 
-function distM(a: LonLat, b: LonLat): number {
-  const kx = Math.cos((a[1] * Math.PI) / 180) * 111_320
-  return Math.hypot((b[0] - a[0]) * kx, (b[1] - a[1]) * 110_540)
-}
-
-function idle(map: maplibregl.Map): Promise<void> {
-  return new Promise((resolve) => {
-    const t = setTimeout(resolve, 8000)
-    map.once('idle', () => {
-      clearTimeout(t)
-      resolve()
-    })
-  })
-}

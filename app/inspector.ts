@@ -3,8 +3,8 @@
 
 import { renderLanesElement, wikiUrlForKey, type OsmWay } from '@graphmasters/osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
-import { compareLanes, osmLaneAttributes, WEIGHTS, type AnalysisResult, type MatchResult, type RoadEvent } from '../src/index'
-import { append, badge, clear, dl, formatTime, h, link } from './dom'
+import { compareLanes, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
+import { append, badge, clear, dl, formatTime, h, link, spinner } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 
 export type Tab = 'record' | 'xml' | 'lanes' | 'situation' | 'osm' | 'match'
@@ -17,9 +17,18 @@ export interface InspectorState {
   tab: Tab
   xml: Loadable<{ which: 'record' | 'situation'; text: string }>
   way: Loadable<OsmWay> & { id?: string }
-  match: Loadable<MatchResult & { viewports: number; truncated: boolean }>
+  match: Loadable<RefinedMatchResult & { tiles: number; failedTiles: number; truncated: boolean }>
   /** Candidate key confirmed by the user (manual override). */
   confirmedKey?: string
+  /** Set while an Overpass request for matching is pending: what is being looked up. */
+  overpass?: string
+}
+
+/** What OSM data is being fetched right now, if any. */
+function osmBusy(s: InspectorState): string | undefined {
+  if (s.overpass) return s.overpass
+  if (s.way.status === 'loading') return s.way.id ? `Loading way ${s.way.id} from the OSM API…` : 'Looking up the OSM road at this location in the OSM API…'
+  return undefined
 }
 
 export interface InspectorCallbacks {
@@ -160,9 +169,14 @@ function renderLanes(el: HTMLElement, s: InspectorState, e: RoadEvent) {
   if (li) append(el, h('p', null, 'Impact: ', li))
 
   append(el, h('h3', null, 'OpenStreetMap'))
+  const busy = osmBusy(s)
+  if (busy) {
+    append(el, spinner(busy))
+    return
+  }
   if (s.way.status !== 'done') {
     append(el, 
-      h('p', { class: 'muted' }, s.way.status === 'loading' ? 'Loading OSM way…' : 'No OSM way selected. Run Matching, or switch to "Select OSM road" and click a road.'),
+      h('p', { class: s.way.status === 'error' ? 'error' : 'muted' }, s.way.status === 'error' ? `Could not load the OSM way: ${s.way.message}` : 'No OSM way selected. Run Matching, or switch to "Select OSM road" and click a road.'),
     )
     return
   }
@@ -238,21 +252,22 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
 function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: InspectorCallbacks) {
   const hasLine = e.geometry?.type === 'LineString' || e.geometry?.type === 'MultiLineString'
   append(el, 
-    h('p', { class: 'muted' }, 'Matches the record line against OSM roads from the vector tiles: coverage within 25 m, distance, direction, road number and class. The score ranks candidates; it is not a probability.'),
+    h('p', { class: 'muted' }, 'Matches the record line against OSM roads from the vector tiles (merged features are split into their OSM ways via Overpass): coverage within 25 m, distance, direction, road number and class. The score ranks candidates; it is not a probability.'),
     h('button', { type: 'button', disabled: !hasLine || s.match.status === 'loading', onclick: () => cb.runMatch() }, s.match.status === 'done' ? 'Match again' : 'Match to OSM'),
   )
   if (!hasLine) {
     append(el, h('p', null, 'Matching needs a line geometry. This record has ', e.geometryConfidence === 'none' ? 'none' : 'only points', '.'))
     return
   }
-  if (s.match.status === 'loading') append(el, h('p', { class: 'muted' }, s.match.note ?? 'Matching…'))
+  if (s.match.status === 'loading') append(el, spinner(s.overpass ?? s.match.note ?? 'Matching…'))
   if (s.match.status === 'error') append(el, h('p', { class: 'error' }, s.match.message))
   if (s.match.status !== 'done') return
   const m = s.match.value
   const statusText = { matched: 'matched', ambiguous: 'ambiguous: no unambiguous match', none: 'no match' }[m.status]
   append(el, 
-    h('p', null, badge(statusText, m.status === 'matched' ? 'ok' : m.status === 'ambiguous' ? 'warning' : 'error'), ` · confidence score ${m.confidence.toFixed(2)} · ${Math.round(m.coverage * 100)}% of the record explained · ${m.samples} samples · ${m.viewports} map view(s)`),
+    h('p', null, badge(statusText, m.status === 'matched' ? 'ok' : m.status === 'ambiguous' ? 'warning' : 'error'), ` · confidence score ${m.confidence.toFixed(2)} · ${Math.round(m.coverage * 100)}% of the record explained · ${m.samples} samples · ${m.tiles} z14 tile(s)`),
     m.truncated ? h('p', { class: 'warning' }, 'The record is long; only part of it was searched.') : null,
+    m.failedTiles ? h('p', { class: 'warning' }, `${m.failedTiles} tile(s) could not be loaded; roads there are missing.`) : null,
     h('ul', { class: 'compact' }, ...m.reasons.map((x) => h('li', null, x))),
   )
   const table = h('table', { class: 'cands' })
@@ -275,16 +290,17 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
       ),
     )
   }
-  append(el, table, h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison. merged/… candidates are tile features merged from several ways; their OSM way is looked up by location.'))
+  append(el, table, h('p', { class: 'muted' }, 'Green on the map: ways chosen to explain the record. "use" picks a way manually and loads its OSM tags for the lane comparison. merged/… candidates are tile features merged from several ways. When one is the best candidate, its OSM ways of the same road class are fetched from Overpass and scored in its place.'))
 }
 
 function renderOsm(el: HTMLElement, s: InspectorState, e: RoadEvent | undefined) {
-  if (s.way.status === 'idle') {
-    append(el, h('p', { class: 'muted' }, 'Switch the map to "Select OSM road", zoom in to level 14 or more and click a road. Only the way id is sent to the OSM API.'))
+  const busy = osmBusy(s)
+  if (busy || s.way.status === 'loading') {
+    append(el, spinner(busy ?? 'Loading the OSM way…'))
     return
   }
-  if (s.way.status === 'loading') {
-    append(el, h('p', { class: 'muted' }, `Loading way ${s.way.id ?? ''} from the OSM API…`))
+  if (s.way.status === 'idle') {
+    append(el, h('p', { class: 'muted' }, 'Switch the map to "Select OSM road", zoom in to level 14 or more and click a road. Only the way id is sent to the OSM API.'))
     return
   }
   if (s.way.status === 'error') {

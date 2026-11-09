@@ -1,7 +1,7 @@
 import { fetchWayFromOsmApi, type OsmWay } from '@graphmasters/osm-lanes'
-import { linesOf, matchEvent, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
+import { linesOf, matchEventRefined, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
 import { formatBytes } from './dom'
-import { fetchHighwaysNear, nearestWay } from './osm'
+import { fetchHighwaysInBbox, fetchHighwaysNear, nearestWay } from './osm'
 import { renderInspector, type InspectorState, type Tab } from './inspector'
 import { RoadworksMap } from './map'
 import { RecordList } from './records'
@@ -182,6 +182,7 @@ function select(i: number | null, fromList: boolean) {
   state.index = i
   state.xml = { status: 'idle' }
   state.match = { status: 'idle' }
+  state.overpass = undefined
   state.confirmedKey = undefined
   roadMap.showCandidates(null)
   roadMap.select(i, fromList)
@@ -297,10 +298,10 @@ async function runMatch() {
   if (!lines.length) return
   matchAbort?.abort()
   const ac = (matchAbort = new AbortController())
-  state.match = { status: 'loading', note: 'Reading road features from the map…' }
+  state.match = { status: 'loading', note: 'Reading road tiles…' }
   render()
   try {
-    const { candidates, viewports, truncated } = await roadMap.collectCandidates(
+    const { candidates, tiles, failed, truncated } = await roadMap.collectCandidates(
       lines,
       (note) => {
         if (ac.signal.aborted) return
@@ -310,8 +311,27 @@ async function runMatch() {
       ac.signal,
     )
     if (ac.signal.aborted) return
-    const m = matchEvent(lines, candidates, { roadNumber: e.roadNumber })
-    state.match = { status: 'done', value: { ...m, viewports, truncated } }
+    const m = await matchEventRefined(lines, candidates, (bbox, highways) =>
+        fetchHighwaysInBbox(bbox, highways, {
+          signal: ac.signal,
+          onStatus: (text) => {
+            if (ac.signal.aborted) return
+            state.overpass = text
+            render()
+          },
+        }),
+      {
+        roadNumber: e.roadNumber,
+        onFetch: (r) => {
+          if (ac.signal.aborted) return
+          state.overpass = `Fetching the OSM ways (highway=${r.highways.join('|')}) of merged tile feature ${r.key} from Overpass…`
+          render()
+        },
+      },
+    )
+    state.overpass = undefined
+    if (ac.signal.aborted) return
+    state.match = { status: 'done', value: { ...m, tiles, failedTiles: failed, truncated } }
     roadMap.showCandidates(m)
     const first = m.sequence[0]
     if (m.status !== 'none' && first) {
@@ -321,7 +341,10 @@ async function runMatch() {
       else if (mid) void loadWayNear(mid, false)
     }
   } catch (err) {
-    if (!ac.signal.aborted) state.match = { status: 'error', message: (err as Error).message }
+    if (!ac.signal.aborted) {
+      state.overpass = undefined
+      state.match = { status: 'error', message: (err as Error).message }
+    }
   }
   render()
 }

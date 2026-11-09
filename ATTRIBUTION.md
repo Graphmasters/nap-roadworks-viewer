@@ -17,6 +17,7 @@ The source code of nap-roadworks-viewer is licensed under the Apache License 2.0
 |---|---|---|
 | [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) | BSD-3-Clause | Map rendering. |
 | [xmllint-wasm](https://github.com/noppa/xmllint-wasm) (libxml2) | MIT | XSD validation in the browser. |
+| [@mapbox/vector-tile](https://github.com/mapbox/vector-tile-js), [pbf](https://github.com/mapbox/pbf) | BSD-3-Clause | Decoding vector tiles for matching. |
 
 ## Map
 
@@ -28,7 +29,9 @@ The source code of nap-roadworks-viewer is licensed under the Apache License 2.0
 | Map style | basemap.world Web Vektor by [BKG](https://basemap.de/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), adapted to OpenFreeMap tiles by Graphmasters in [basemap-world-openfreemap](https://github.com/Graphmasters/basemap-world-openfreemap) ([full credits](https://graphmasters.github.io/basemap-world-openfreemap/attribution.html)). Not an official BKG product. |
 
 Way tags shown in the inspector are fetched live from the [OSM API](https://wiki.openstreetmap.org/wiki/API_v0.6)
-(© OpenStreetMap contributors, ODbL).
+(© OpenStreetMap contributors, ODbL). Matching splits merged tile features into OSM ways with the
+[Overpass API](https://overpass-api.de/) instance operated by FOSSGIS e.V., with
+[overpass.private.coffee](https://overpass.private.coffee/) (Private.coffee) and the OSM API as fallbacks.
 
 ## DATEX II data
 

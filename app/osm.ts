@@ -1,7 +1,8 @@
 // OSM API helpers. Tile features merged from several ways carry no usable way id; for those the
 // way under the pointer is found with a small bounding-box query (`/api/0.6/map.json`).
 
-import { DEFAULT_OSM_API_BASE_URL, type OsmWay } from '@graphmasters/osm-lanes'
+import { DEFAULT_OSM_API_BASE_URL, DEFAULT_OVERPASS_ENDPOINT, type OsmWay } from '@graphmasters/osm-lanes'
+import type { Bbox, HighwayWay } from '../src/index'
 
 interface ApiNode {
   type: 'node'
@@ -19,12 +20,16 @@ interface ApiWay {
 }
 
 /** OSM ways with a highway tag within `radiusM` of the point, with geometry. */
-export async function fetchHighwaysNear(lon: number, lat: number, radiusM = 25, signal?: AbortSignal): Promise<OsmWay[]> {
+export function fetchHighwaysNear(lon: number, lat: number, radiusM = 25, signal?: AbortSignal): Promise<OsmWay[]> {
   const dLat = radiusM / 110_540
   const dLon = radiusM / (111_320 * Math.cos((lat * Math.PI) / 180))
-  const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map((v) => v.toFixed(7)).join(',')
-  const res = await fetch(`${DEFAULT_OSM_API_BASE_URL}/api/0.6/map.json?bbox=${bbox}`, { signal, headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(`OSM API answered ${res.status} ${res.statusText}`)
+  return fetchOsmApiHighways([lon - dLon, lat - dLat, lon + dLon, lat + dLat], signal)
+}
+
+/** All OSM ways with a highway tag in the bbox, from the OSM API (`map.json`, returns every element in it). */
+async function fetchOsmApiHighways(bbox: Bbox, signal?: AbortSignal): Promise<OsmWay[]> {
+  const res = await fetch(`${DEFAULT_OSM_API_BASE_URL}/api/0.6/map.json?bbox=${bbox.map((v) => v.toFixed(7)).join(',')}`, { signal, headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`${hostOf(DEFAULT_OSM_API_BASE_URL)} answered ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`)
   const json = (await res.json()) as { elements: Array<ApiNode | ApiWay> }
   const nodes = new Map<number, ApiNode>()
   for (const e of json.elements) if (e.type === 'node') nodes.set(e.id, e)
@@ -58,4 +63,109 @@ export function nearestWay(ways: OsmWay[], lon: number, lat: number): { way: Osm
     }
   }
   return best
+}
+
+// Ways of given highway values in a bbox, used to split merged tile features into the OSM ways
+// they were built from. User-triggered and small (one road class, the covered part of a record).
+//
+// Sources: boxes up to 500 × 500 m go to the OSM API first (`map.json`: fast and reliable, but it
+// returns every element in the box), then Overpass. Larger boxes go to overpass-api.de (FOSSGIS
+// e.V.) first, then, if still small enough, the OSM API, then a second public Overpass instance.
+
+/** Overpass instances, tried in order (see https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances). */
+export const OVERPASS_ENDPOINTS = [DEFAULT_OVERPASS_ENDPOINT, 'https://overpass.private.coffee/api/interpreter']
+/** Boxes up to this area (square degrees, ≈ 3–5 km²) may use the OSM API, which returns all elements. */
+export const OSM_API_MAX_AREA = 0.0005
+/** Boxes no wider and no taller than this (metres) ask the OSM API first. */
+export const OSM_API_FIRST_M = 500
+const OVERPASS_TIMEOUT_MS = 90_000
+
+const highwayCache = new Map<string, Promise<HighwayWay[]>>()
+
+interface OverpassWay {
+  type: 'way'
+  id: number
+  tags?: Record<string, string>
+  geometry?: Array<{ lat: number; lon: number } | null>
+}
+
+const hostOf = (url: string) => new URL(url).host
+
+async function fetchOverpass(endpoint: string, query: string, signal?: AbortSignal): Promise<HighwayWay[]> {
+  const timeout = AbortSignal.timeout(OVERPASS_TIMEOUT_MS)
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    body: new URLSearchParams({ data: query }),
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`${hostOf(endpoint)} answered ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`)
+  const json = (await res.json()) as { elements?: OverpassWay[] }
+  return (json.elements ?? [])
+    .filter((x): x is OverpassWay => x.type === 'way')
+    .map((x) => ({
+      id: String(x.id),
+      tags: x.tags ?? {},
+      geometry: (x.geometry ?? []).filter((g): g is { lat: number; lon: number } => !!g).map((g) => [g.lon, g.lat] as [number, number]),
+      source: `Overpass (${hostOf(endpoint)})`,
+    }))
+}
+
+/** One failure as "<host> answered 502" / "<host> did not answer in time" / "<host> is unreachable". */
+function describe(err: unknown, host: string, signal?: AbortSignal): string {
+  if (signal?.aborted) throw err
+  const e = err as Error
+  if (e.name === 'TimeoutError') return `${host} did not answer in time`
+  if (e.name === 'TypeError') return `${host} is unreachable`
+  return e.message.startsWith(host) ? e.message : `${host}: ${e.message}`
+}
+
+export function fetchHighwaysInBbox(
+  bbox: Bbox,
+  highways: string[],
+  options: { signal?: AbortSignal; onStatus?: (text: string) => void } = {},
+): Promise<HighwayWay[]> {
+  const { signal, onStatus } = options
+  const [w, s, e, n] = bbox
+  const values = highways.map((v) => v.replace(/[^a-z_]/g, ''))
+  const query = `[out:json][timeout:25];way["highway"~"^(${values.join('|')})$"](${[s, w, n, e].map((v) => v.toFixed(6)).join(',')});out tags geom;`
+  const cached = highwayCache.get(query)
+  if (cached) return cached
+  const kx = 111_320 * Math.cos((((s + n) / 2) * Math.PI) / 180)
+  const tiny = (e - w) * kx <= OSM_API_FIRST_M && (n - s) * 110_540 <= OSM_API_FIRST_M
+  const small = (e - w) * (n - s) <= OSM_API_MAX_AREA
+  const [primary, ...others] = OVERPASS_ENDPOINTS
+
+  type Step = { host: string; run: () => Promise<HighwayWay[]> }
+  const osmApi: Step = {
+    host: hostOf(DEFAULT_OSM_API_BASE_URL),
+    run: async () => {
+      const wanted = new Set(values)
+      return (await fetchOsmApiHighways(bbox, signal))
+        .filter((x) => wanted.has(x.tags['highway'] ?? ''))
+        .map((x) => ({ id: x.id, tags: x.tags, geometry: (x.geometry ?? []).map((g) => [g.lon, g.lat] as [number, number]), source: 'OSM API' }))
+    },
+  }
+  const overpass = (endpoint: string): Step => ({ host: hostOf(endpoint), run: () => fetchOverpass(endpoint, query, signal) })
+  // ≤ 500 × 500 m: OSM API first (answers in seconds). Otherwise Overpass first, the OSM API only
+  // for boxes small enough for `map.json`, then the other Overpass instances.
+  const steps: Step[] = tiny
+    ? [osmApi, overpass(primary!), ...others.map(overpass)]
+    : [overpass(primary!), ...(small ? [osmApi] : []), ...others.map(overpass)]
+
+  const p = (async () => {
+    const failures: string[] = []
+    for (const [i, step] of steps.entries()) {
+      if (i > 0) onStatus?.(`${failures.join('; ')}. Trying ${step.host}${step === osmApi ? '' : ' (can take a minute)'}…`)
+      try {
+        return await step.run()
+      } catch (err) {
+        failures.push(describe(err, step.host, signal))
+      }
+    }
+    throw new Error(failures.join('; '))
+  })()
+  highwayCache.set(query, p)
+  p.catch(() => highwayCache.delete(query))
+  return p
 }

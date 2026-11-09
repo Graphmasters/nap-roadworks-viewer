@@ -43,6 +43,8 @@ export interface ScoredCandidate {
   components: ScoreComponents
   meanDistanceM?: number
   coveredSamples: number
+  /** Bounding box `[west, south, east, north]` of the event samples this candidate covers. */
+  coveredBbox?: [number, number, number, number]
   reasons: string[]
 }
 
@@ -90,7 +92,10 @@ function projector(lines: LonLat[][]) {
   lat0 /= n || 1
   const kx = Math.cos((lat0 * Math.PI) / 180) * 111_320
   const ky = 110_540
-  return ([lon, lat]: LonLat): [number, number] => [(lon - lon0) * kx, (lat - lat0) * ky]
+  return {
+    project: ([lon, lat]: LonLat): [number, number] => [(lon - lon0) * kx, (lat - lat0) * ky],
+    unproject: (x: number, y: number): LonLat => [lon0 + x / kx, lat0 + y / ky],
+  }
 }
 
 function bearingOf(ax: number, ay: number, bx: number, by: number): number {
@@ -167,7 +172,7 @@ function expectedClasses(roadNumber: string): Set<string> | undefined {
 
 export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[], options: MatchOptions = {}): MatchResult {
   const buffer = options.bufferM ?? 25
-  const project = projector(eventLines)
+  const { project, unproject } = projector(eventLines)
   const samples = sampleLines(eventLines.map((l) => l.map(project)), options.maxSamples ?? 400)
   if (!samples.length || !candidates.length)
     return { status: 'none', sequence: [], coverage: 0, confidence: 0, ranked: [], samples: samples.length, reasons: [candidates.length ? 'The event line is empty.' : 'No road candidates near the event.'] }
@@ -177,12 +182,17 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
   const ranked: ScoredCandidate[] = candidates.map((c) => {
     const lines = c.lines.map((l) => l.map(project))
     const covered = new Set<number>()
+    let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
     let dist = 0
     let bearing = 0
     for (const s of samples) {
       const n = nearest(s.x, s.y, lines)
       if (n.d > buffer) continue
       covered.add(s.index)
+      minX = Math.min(minX, s.x)
+      minY = Math.min(minY, s.y)
+      maxX = Math.max(maxX, s.x)
+      maxY = Math.max(maxY, s.y)
       dist += n.d
       let diff = Math.abs(((s.bearing - n.bearing + 540) % 360) - 180) // 0 = same direction, 180 = opposite
       if (c.oneway === -1) diff = 180 - diff
@@ -216,7 +226,8 @@ export function matchEvent(eventLines: LonLat[][], candidates: MatchCandidate[],
       WEIGHTS.bearing * components.bearing +
       WEIGHTS.ref * components.ref +
       WEIGHTS.roadClass * components.roadClass
-    return { candidate: c, score: k ? score : 0, components, meanDistanceM: k ? dist / k : undefined, coveredSamples: k, reasons }
+    const coveredBbox: ScoredCandidate['coveredBbox'] = k ? [...unproject(minX, minY), ...unproject(maxX, maxY)] : undefined
+    return { candidate: c, score: k ? score : 0, components, meanDistanceM: k ? dist / k : undefined, coveredSamples: k, coveredBbox, reasons }
   })
   ranked.sort((a, b) => b.score - a.score)
 

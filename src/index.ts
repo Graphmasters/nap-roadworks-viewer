@@ -29,4 +29,14 @@ export {
   type ScoreComponents,
   type LonLat,
 } from './matching/score'
+export {
+  highwayValuesFor,
+  matchEventRefined,
+  type Bbox,
+  type HighwayFetcher,
+  type HighwayWay,
+  type RefinedMatchResult,
+  type Refinement,
+  type RefineOptions,
+} from './matching/refine'
 export type { XmlElement } from './xml/tree'

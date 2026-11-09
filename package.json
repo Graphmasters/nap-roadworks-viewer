@@ -2,7 +2,16 @@
   "name": "@graphmasters/nap-roadworks-viewer",
   "version": "0.1.0",
   "description": "Inspect DATEX II roadworks and road-closure feeds in the browser: XML/profile checks, map, OSM road lookup, lane comparison and passability analysis.",
-  "keywords": ["datex2", "datexii", "napcore", "national-access-point", "roadworks", "road-closure", "openstreetmap", "maplibre"],
+  "keywords": [
+    "datex2",
+    "datexii",
+    "napcore",
+    "national-access-point",
+    "roadworks",
+    "road-closure",
+    "openstreetmap",
+    "maplibre"
+  ],
   "license": "Apache-2.0",
   "author": "Graphmasters",
   "repository": {
@@ -13,7 +22,11 @@
   "bugs": "https://github.com/Graphmasters/nap-roadworks-viewer/issues",
   "type": "module",
   "sideEffects": false,
-  "files": ["dist", "NOTICE", "ATTRIBUTION.md"],
+  "files": [
+    "dist",
+    "NOTICE",
+    "ATTRIBUTION.md"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,8 +55,10 @@
     "saxes": "6.0.0"
   },
   "devDependencies": {
+    "@mapbox/vector-tile": "~2.0.5",
     "@types/geojson": "7946.0.16",
     "maplibre-gl": "~5.24.0",
+    "pbf": "~4.0.2",
     "tsup": "~8.5.1",
     "typescript": "~5.9.3",
     "vite": "~7.3.7",
