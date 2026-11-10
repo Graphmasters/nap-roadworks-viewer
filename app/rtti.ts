@@ -9,6 +9,19 @@ export interface RttiCallbacks {
   onRecord(id: string): void
 }
 
+export interface RttiOptions {
+  /**
+   * Where the data came from. For an uploaded file, criteria that a file cannot show (update
+   * cycle, timeliness, secure API access) are left out of the panel.
+   */
+  source: 'file'
+}
+
+/** Criteria the panel shows for the given source. */
+function shown(c: RttiCriterionResult, opts: RttiOptions): boolean {
+  return !(opts.source === 'file' && c.kind === 'not-from-file')
+}
+
 const RECORD_BUTTONS = 12
 
 export function stars(level: number): HTMLElement {
@@ -74,12 +87,12 @@ function criterionRow(c: RttiCriterionResult, xsd: XsdState, r: AnalysisResult, 
   )
 }
 
-function useCaseBlock(u: RttiUseCaseResult, open: boolean, xsd: XsdState, r: AnalysisResult, cb: RttiCallbacks): HTMLElement {
+function useCaseBlock(u: RttiUseCaseResult, open: boolean, xsd: XsdState, r: AnalysisResult, cb: RttiCallbacks, opts: RttiOptions): HTMLElement {
   const basis = Object.entries(u.basis)
     .map(([k, v]) => `${k}: ${v.toLocaleString('en')}`)
     .join(' · ')
   const list = h('div', { class: 'crit-list' })
-  for (const c of u.criteria) list.append(criterionRow(c, xsd, r, cb))
+  for (const c of u.criteria) if (shown(c, opts)) list.append(criterionRow(c, xsd, r, cb))
   return h(
     'details',
     { class: 'rtti-uc', open: open || undefined },
@@ -89,7 +102,7 @@ function useCaseBlock(u: RttiUseCaseResult, open: boolean, xsd: XsdState, r: Ana
   )
 }
 
-export function renderRtti(el: HTMLElement, r: AnalysisResult, xsd: XsdState, cb: RttiCallbacks) {
+export function renderRtti(el: HTMLElement, r: AnalysisResult, xsd: XsdState, cb: RttiCallbacks, opts: RttiOptions = { source: 'file' }) {
   clear(el)
   const a = r.rtti
   append(
@@ -104,7 +117,7 @@ export function renderRtti(el: HTMLElement, r: AnalysisResult, xsd: XsdState, cb
   )
   if (!a) return
   if (!a.useCases.length) append(el, h('p', null, badge('nothing to rate', 'muted'), ' The file contains no roadworks or road closures in scope.'))
-  a.useCases.forEach((u, i) => el.append(useCaseBlock(u, i === 0, xsd, r, cb)))
+  a.useCases.forEach((u, i) => el.append(useCaseBlock(u, i === 0, xsd, r, cb, opts)))
   if (a.outOfScope.length) {
     const list = h('ul', { class: 'compact' })
     for (const o of a.outOfScope) {

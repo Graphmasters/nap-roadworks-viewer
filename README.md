@@ -56,7 +56,8 @@ The [TISA RTTI 5-Star Rating Specification v1.0](https://tisa.org/rtti-5-star-ra
 (21 October 2025) rates roadworks and road-closure data per criterion from 1★ to 5★ (Tables 15–18).
 The viewer sorts each situation into one of the four use cases and shows, per criterion, the
 **highest level this file allows**: a ceiling, not a rating. The feed cannot score higher on that
-criterion, but it may score lower once the criteria a file cannot show are measured. TISA's
+criterion, but it may score lower once the criteria a file cannot show are measured; those are not
+shown for an uploaded file. TISA's
 Evaluation Methodology is not published yet. The viewer shows no overall star value.
 
 | Criterion | Checked in the file | Ceiling |
@@ -74,7 +75,7 @@ Evaluation Methodology is not published yet. The viewer shows no overall star va
 | Outdated messages | Age of ended records at `publicationTime` | 24 h 5★ … 4 weeks 1★ |
 | Validity, road type, lane level, vehicle classes, cause type | Start/end and schedules (`RTTI-VAL-01`), lane detail per situation, vehicle characteristics, closure causes (`RTTI-CAUSE-01`) | per table |
 | Pre-announcement, short-term events | Lead time from creation to start; unplanned works present | shown, no level |
-| Update cycle, timeliness, secure API, ID stability | Not visible in one file; the panel says what is needed (repeated downloads, the access URL). Missing creation or version times are reported (`RTTI-TIME-01`) | — |
+| Update cycle, timeliness, secure API, ID stability | Not shown for an uploaded file: they need repeated downloads or the access URL. Missing creation or version times are still reported (`RTTI-TIME-01`) | — |
 
 Assumptions:
 - **Planned vs unplanned.** `urgentRoadworks`, else the lead time from `situationRecordCreationTime`
