@@ -7,7 +7,8 @@ import type { AnalysisResult, AxisOrder, FeedMeta, Finding, RoadEvent, Situation
 import { analysePassability, passabilityToFinding } from './passability/classify'
 import { normaliseSituation, type PendingGeometry } from './records/normalise'
 import { detectProfile, profileById } from './validation/profiles'
-import { feedChecks, recordChecks } from './validation/rules'
+import { assessRtti } from './rtti/assess'
+import { feedChecks, openlrChecks, recordChecks } from './validation/rules'
 
 /** Findings stored per rule id; further ones are only counted. */
 export const FINDINGS_PER_RULE = 2000
@@ -131,9 +132,12 @@ export function runChecks(
   }
   all.push(...feedChecks(meta, situations))
   all.push(...recordChecks(events, meta, duplicates.length ? duplicates : findDuplicates(situations)))
+  all.push(...openlrChecks(events))
   all.push(...pass.referenceFindings)
   all.push(...pass.findings.map(passabilityToFinding))
   all.push(...profile.checks(ctx))
+  const rtti = assessRtti(result, all)
+  all.push(...rtti.findings)
 
   const counts: Record<string, number> = {}
   const kept: Finding[] = []
@@ -146,6 +150,7 @@ export function runChecks(
   result.passability = pass.findings
   result.recordPassability = pass.records
   result.profileId = profile.id
+  result.rtti = rtti.assessment
   return result
 }
 

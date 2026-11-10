@@ -6,6 +6,7 @@ import { renderInspector, showReversed, type InspectorState, type Tab } from './
 import { RoadworksMap } from './map'
 import { RecordList } from './records'
 import { renderReport, type XsdState } from './report'
+import { renderRtti } from './rtti'
 import type { WorkerRequest, WorkerResponse } from './worker'
 import { validateWithXsd, XSD_MAX_BYTES } from './xsd'
 import './style.css'
@@ -17,6 +18,7 @@ const progress = $('progress')
 const progressBar = $('progress-bar')
 const progressText = $('progress-text')
 const reportEl = $('report')
+const rttiEl = $('rtti')
 const inspectorEl = $('inspector')
 const hint = $('hint')
 const intro = $('intro')
@@ -117,6 +119,7 @@ function analyse() {
   progressBar.style.width = '0%'
   progressText.textContent = `Reading ${file.name}…`
   reportEl.replaceChildren()
+  rttiEl.replaceChildren()
   records.setResult(null)
   roadMap.showCandidates(null)
   render()
@@ -137,6 +140,15 @@ function onResult(r: AnalysisResult) {
 
 function renderReportPanel() {
   if (!result) return
+  renderRtti(rttiEl, result, xsd, {
+    onRecord: (id) => {
+      const i = idIndex.get(id)
+      if (i !== undefined) {
+        state.tab = 'qa'
+        select(i, true)
+      }
+    },
+  })
   renderReport(reportEl, result, xsd, {
     onProfile: (id) => {
       profileOverride = id
@@ -156,7 +168,7 @@ function renderReportPanel() {
       const id = f.recordIds?.[0]
       const i = id !== undefined ? idIndex.get(id) : result?.events.findIndex((e) => e.situationId === f.situationId)
       if (i !== undefined && i >= 0) {
-        state.tab = f.layer === 'passability' ? 'situation' : f.layer === 'lanes' ? 'lanes' : 'record'
+        state.tab = f.layer === 'passability' ? 'situation' : f.layer === 'lanes' ? 'lanes' : f.layer === 'rtti' ? 'qa' : 'record'
         select(i, true)
       }
     },
@@ -194,6 +206,7 @@ function select(i: number | null, fromList: boolean) {
   state.confirmedKey = undefined
   roadMap.showCandidates(null)
   roadMap.select(i, fromList)
+  void roadMap.showDetail(i !== null && result ? (result.events[i] ?? null) : null)
   records.select(i, true)
   showCurrentWay()
   if (state.tab === 'xml') void loadXml('record')

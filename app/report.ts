@@ -14,7 +14,7 @@ export interface ReportCallbacks {
 
 export type XsdState = { status: 'none' } | { status: 'running' } | { status: 'done'; outcome: XsdOutcome } | { status: 'error'; message: string }
 
-const LAYER_LABEL: Record<FindingLayer, string> = {
+export const LAYER_LABEL: Record<FindingLayer, string> = {
   xml: 'XML',
   datex: 'DATEX II',
   xsd: 'XSD',
@@ -24,9 +24,10 @@ const LAYER_LABEL: Record<FindingLayer, string> = {
   location: 'Location',
   lanes: 'Lanes',
   passability: 'Passability',
+  rtti: 'RTTI 5-Star',
 }
 
-const RULE_TITLE: Record<string, string> = {
+export const RULE_TITLE: Record<string, string> = {
   'XML-001': 'Not well-formed',
   'XML-002': 'DOCTYPE present',
   'DTX-001': 'No DATEX II namespace',
@@ -52,6 +53,29 @@ const RULE_TITLE: Record<string, string> = {
   'MDM-H01': 'Works record without lane status',
   'MDM-H02': 'Management record without cause link',
   'NDW-H01': 'AlertC location without gmlLineString',
+  'OLR-001': 'OpenLR coordinate missing or not a number',
+  'OLR-002': 'OpenLR coordinate not WGS 84 degrees',
+  'OLR-003': 'OpenLR latitude/longitude swapped',
+  'OLR-004': 'OpenLR far from the record geometry',
+  'OLR-005': 'OpenLR LRPs farther apart than their DNP',
+  'OLR-006': 'OpenLR reference incomplete',
+  'RTTI-LOC-01': 'No location reference that counts for RTTI',
+  'RTTI-LIN-01': 'No polyline (RTTI linear referencing)',
+  'RTTI-LIN-02': 'Polyline defects',
+  'RTTI-LIN-03': 'Polyline not in WGS 84 (not checked)',
+  'RTTI-DIR-01': 'Direction along the polyline ambiguous',
+  'RTTI-DIR-02': 'OpenLR contradicts the polyline',
+  'RTTI-DIR-03': 'Location references disagree on direction',
+  'RTTI-ACC-01': 'Coarse coordinate resolution',
+  'RTTI-ACC-02': 'Point far from its own polyline',
+  'RTTI-TERM-01': 'All lanes restricted but not a closure',
+  'RTTI-SPEC-01': 'Deviation from the DATEX II RTTI reference profile',
+  'RTTI-SPEC-02': 'Closures encoded in two ways',
+  'RTTI-ID-01': 'Record without id, version or version time',
+  'RTTI-ID-02': 'Probable duplicate event',
+  'RTTI-VAL-01': 'Missing start or end time',
+  'RTTI-CAUSE-01': 'Closure without cause',
+  'RTTI-TIME-01': 'Missing creation or version time',
 }
 
 export function renderReport(el: HTMLElement, r: AnalysisResult, xsd: XsdState, cb: ReportCallbacks) {
@@ -91,6 +115,7 @@ export function renderReport(el: HTMLElement, r: AnalysisResult, xsd: XsdState, 
         ['SOAP envelope', m.soapEnvelope ? 'yes' : undefined],
         ['Situations', r.situations.length.toLocaleString('en')],
         ['Records', r.events.length.toLocaleString('en')],
+        ['OpenLR', openlrText(r)],
       ]),
       axisControl(r, cb),
     ),
@@ -188,6 +213,16 @@ export function renderReport(el: HTMLElement, r: AnalysisResult, xsd: XsdState, 
       sorted.length ? list : h('p', null, 'No findings.'),
     ),
   )
+}
+
+/** Whether the feed carries OpenLR, how it is encoded and whether its coordinates are WGS 84. */
+export function openlrText(r: AnalysisResult): string {
+  const o = r.rtti?.openlr
+  if (!o || !o.recordsWithOpenlr) return 'not present'
+  const enc = [o.structured && `structured ${o.structured.toLocaleString('en')}`, o.binary && `binary ${o.binary.toLocaleString('en')} (not decoded)`].filter(Boolean).join(' · ')
+  const kinds = [o.lines && `${o.lines.toLocaleString('en')} line`, o.points && `${o.points.toLocaleString('en')} point`, o.areas && `${o.areas.toLocaleString('en')} area`].filter(Boolean).join(', ')
+  const lrps = o.lrps ? ` · LRP coordinates valid WGS 84: ${o.validLrps.toLocaleString('en')} of ${o.lrps.toLocaleString('en')}` : ''
+  return `present in ${o.recordsWithOpenlr.toLocaleString('en')} of ${o.records.toLocaleString('en')} records (${enc}${kinds ? `; ${kinds}` : ''})${lrps}`
 }
 
 function section(title: string, ...children: Array<Node | null>): HTMLElement {

@@ -8,7 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { decodeTileFeatureId, type OsmWay } from 'osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
-import { linesOf, type LonLat, type MatchResult, type RecordPassability, type RoadEvent } from '../src/index'
+import { linesOf, validWgs84, type LonLat, type MatchResult, type RecordPassability, type RoadEvent } from '../src/index'
 import { readRoadCandidates, type TileRead } from './tiles'
 
 // MapLibre 6 resolves its worker file at runtime, which bundlers cannot follow; hand it the
@@ -103,6 +103,9 @@ const DIRECTION_LAYOUT = {
   'icon-allow-overlap': true,
   'icon-ignore-placement': true,
 } satisfies maplibregl.SymbolLayerSpecification['layout']
+/** The selected record's decoded OpenLR location reference points. */
+const OPENLR = 'nrv-openlr'
+const OPENLR_COLOR = '#0f766e'
 
 export class RoadworksMap {
   readonly map: maplibregl.Map
@@ -146,6 +149,7 @@ export class RoadworksMap {
     this.map.addSource(CANDIDATES, { type: 'geojson', data: empty })
     this.map.addSource(EVENTS, { type: 'geojson', data: empty, promoteId: 'i' })
     this.map.addSource(SELECTED, { type: 'geojson', data: empty })
+    this.map.addSource(OPENLR, { type: 'geojson', data: empty })
 
     this.map.addLayer({
       id: `${CANDIDATES}-line`,
@@ -240,7 +244,41 @@ export class RoadworksMap {
     })
     // The record chevrons go on top: the matched way usually covers the record line.
     this.map.moveLayer(`${SELECTED}-direction`)
+    // Decoded OpenLR points of the selected record, above everything else.
+    this.map.addLayer({
+      id: `${OPENLR}-line`,
+      type: 'line',
+      source: OPENLR,
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: { 'line-color': OPENLR_COLOR, 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
+    })
+    this.map.addLayer({
+      id: `${OPENLR}-point`,
+      type: 'circle',
+      source: OPENLR,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': ['match', ['get', 'role'], 'mid', 5, 7],
+        'circle-color': ['match', ['get', 'role'], 'first', '#16a34a', 'last', '#b91c1c', '#ffffff'],
+        'circle-stroke-color': OPENLR_COLOR,
+        'circle-stroke-width': 2.5,
+      },
+    })
     this.updateHint()
+  }
+
+  /** Shows the selected record's decoded OpenLR location reference points; null clears them. */
+  async showDetail(e: RoadEvent | null) {
+    await this.ready
+    const features: Feature[] = []
+    for (const r of e?.openlr ?? []) {
+      const pts = r.lrps.filter(validWgs84).map((p) => [p.lon, p.lat] as [number, number])
+      if (pts.length > 1) features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } })
+      pts.forEach((c, i) =>
+        features.push({ type: 'Feature', properties: { role: i === 0 ? 'first' : i === pts.length - 1 ? 'last' : 'mid', n: i + 1 }, geometry: { type: 'Point', coordinates: c } }),
+      )
+    }
+    ;(this.map.getSource(OPENLR) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features })
   }
 
   whenReady(): Promise<void> {

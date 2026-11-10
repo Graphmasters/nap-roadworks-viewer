@@ -713,3 +713,138 @@ table.cands button {
 .lanes-tiny {
   vertical-align: middle;
 }
+
+/* ---------------------------------------------------------------- RTTI 5-Star */
+.rtti p {
+  margin: 4px 0;
+}
+.rtti details.rtti-uc {
+  margin: 8px 0;
+}
+.rtti details.rtti-uc > summary {
+  cursor: pointer;
+}
+.crit-list {
+  margin-top: 4px;
+}
+details.crit {
+  border-left: 3px solid var(--border);
+  padding: 3px 0 3px 8px;
+  margin: 3px 0;
+}
+details.crit.sub {
+  margin-left: 14px;
+}
+details.crit > summary {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 5.6em 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+  list-style: none;
+}
+details.crit > summary::-webkit-details-marker {
+  display: none;
+}
+.crit-level {
+  grid-row: span 2;
+}
+.crit-name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.crit-evidence {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.crit-body {
+  margin: 4px 0 2px;
+  font-size: 12px;
+}
+.stars {
+  letter-spacing: 1px;
+  white-space: nowrap;
+  color: var(--warn);
+}
+.stars.s0 {
+  color: var(--error);
+}
+.weight {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 5px;
+  white-space: nowrap;
+}
+.weight.w-critical {
+  color: var(--error);
+  border-color: currentColor;
+}
+.weight.w-high {
+  color: var(--warn);
+  border-color: currentColor;
+}
+ol.levels {
+  margin: 2px 0;
+  padding-left: 0;
+  list-style: none;
+}
+ol.levels li {
+  color: var(--muted);
+}
+ol.levels li.met {
+  color: var(--fg);
+}
+ol.levels .lvl {
+  display: inline-block;
+  min-width: 2.2em;
+}
+.record-ids {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- decoded OpenLR */
+.openlr {
+  margin: 4px 0 8px;
+}
+table.lrp {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+table.lrp th,
+table.lrp td {
+  text-align: left;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.lrp tr.invalid td {
+  color: var(--error);
+}
+
+/* ---------------------------------------------------------------- QA tab */
+.qa-crit {
+  margin: 4px 0 8px;
+}
+.qa-row {
+  display: grid;
+  grid-template-columns: 5.6em 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+  border-left: 3px solid var(--border);
+  padding: 3px 0 3px 8px;
+  margin: 3px 0;
+}
+.qa-row .crit-evidence,
+.qa-row ul.compact {
+  color: var(--fg);
+  font-size: 13px;
+}
+.small {
+  font-size: 12px;
+}

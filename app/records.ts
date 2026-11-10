@@ -8,7 +8,7 @@ import { TYPE_COLORS } from './map'
 export interface RecordFilter {
   types: Set<RestrictionType>
   passability: Passability | 'any'
-  location: 'any' | 'drawn' | 'not-drawn'
+  location: 'any' | 'drawn' | 'not-drawn' | 'openlr'
   activeNow: boolean
   text: string
   /** Lane configurations; a record matches when it has any of them. Empty = no lane filter. */
@@ -105,7 +105,7 @@ export class RecordList {
       this.apply()
     })
     const loc = h('select', { 'aria-label': 'Location' })
-    loc.append(h('option', { value: 'any' }, 'all locations'), h('option', { value: 'drawn' }, 'on the map'), h('option', { value: 'not-drawn' }, 'not drawable'))
+    loc.append(h('option', { value: 'any' }, 'all locations'), h('option', { value: 'drawn' }, 'on the map'), h('option', { value: 'not-drawn' }, 'not drawable'), h('option', { value: 'openlr' }, 'OpenLR present'))
     loc.addEventListener('change', () => {
       this.filter.location = loc.value as RecordFilter['location']
       this.apply()
@@ -162,6 +162,7 @@ export class RecordList {
     if (f.passability !== 'any' && this.result!.recordPassability[e.id]?.classification !== f.passability) return false
     if (f.location === 'drawn' && !e.geometry) return false
     if (f.location === 'not-drawn' && e.geometry) return false
+    if (f.location === 'openlr' && !e.openlr.length) return false
     if (f.activeNow) {
       const from = e.validFrom ? Date.parse(e.validFrom) : -Infinity
       const to = e.validTo ? Date.parse(e.validTo) : Infinity
