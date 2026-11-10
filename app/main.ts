@@ -1,8 +1,8 @@
 import { fetchWayFromOsmApi, type OsmWay } from 'osm-lanes'
-import { linesOf, matchEventRefined, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
+import { linesOf, matchEventRefined, recordWayOrientation, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
 import { formatBytes } from './dom'
 import { fetchHighwaysInBbox, fetchHighwaysNear, nearestWay } from './osm'
-import { renderInspector, type InspectorState, type Tab } from './inspector'
+import { renderInspector, showReversed, type InspectorState, type Tab } from './inspector'
 import { RoadworksMap } from './map'
 import { RecordList } from './records'
 import { renderReport, type XsdState } from './report'
@@ -33,7 +33,7 @@ let xsd: XsdState = { status: 'none' }
 let idIndex = new Map<string, number>()
 let visible: Set<number> | undefined
 
-const state: InspectorState = { result: null, index: null, tab: 'record', xml: { status: 'idle' }, way: { status: 'idle' }, match: { status: 'idle' } }
+const state: InspectorState = { result: null, index: null, tab: 'record', xml: { status: 'idle' }, way: { status: 'idle' }, match: { status: 'idle' }, orientation: 0, wayReversed: false }
 
 // ---------------------------------------------------------------------------------------- worker
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -112,6 +112,7 @@ function analyse() {
   if (!file) return
   result = null
   xsd = { status: 'none' }
+  clearTimeout(autoMatch)
   Object.assign(state, { result: null, index: null, xml: { status: 'idle' }, match: { status: 'idle' } })
   intro.hidden = true
   progress.hidden = false
@@ -189,19 +190,46 @@ async function runXsd(files: File[], main: string) {
 }
 
 // ------------------------------------------------------------------------------------- selection
+/** Delay before matching a newly selected record, so browsing the list with the arrow keys does not start a match per record. */
+const AUTO_MATCH_DELAY_MS = 250
+let autoMatch: ReturnType<typeof setTimeout> | undefined
+
 function select(i: number | null, fromList: boolean) {
   matchAbort?.abort()
+  wayAbort?.abort()
+  clearTimeout(autoMatch)
   state.index = i
   state.xml = { status: 'idle' }
   state.match = { status: 'idle' }
+  state.way = { status: 'idle' }
   state.overpass = undefined
   state.confirmedKey = undefined
   roadMap.showCandidates(null)
   roadMap.select(i, fromList)
   void roadMap.showDetail(i !== null && result ? (result.events[i] ?? null) : null)
   records.select(i, true)
+  showCurrentWay()
   if (state.tab === 'xml') void loadXml('record')
+  // Match every record with a line right away; the best way is loaded when matching is done.
+  const e = i !== null ? result?.events[i] : undefined
+  if (e && linesOf(e.geometry).length) {
+    state.match = { status: 'loading', note: 'Reading road tiles…' }
+    autoMatch = setTimeout(() => void runMatch(), AUTO_MATCH_DELAY_MS)
+  }
   render()
+}
+
+/**
+ * Shows the loaded way on the map, reversed when the selected record runs against a two-way way,
+ * and remembers the record's direction relative to it for the inspector.
+ */
+function showCurrentWay() {
+  const way = state.way.status === 'done' ? state.way.value : null
+  const e = result && state.index !== null ? result.events[state.index] : undefined
+  const lines = linesOf(e?.geometry)
+  state.orientation = way?.geometry && lines.length ? recordWayOrientation(lines, way.geometry.map((p) => [p.lon, p.lat])) : 0
+  state.wayReversed = !!way && showReversed(way, state.orientation)
+  roadMap.showWay(way, state.wayReversed)
 }
 
 function render() {
@@ -266,12 +294,11 @@ async function loadWay(id: string, showTab: boolean) {
     }
     if (ac.signal.aborted) return
     state.way = { status: 'done', value: way, id }
-    roadMap.showWay(way)
   } catch (err) {
     if (ac.signal.aborted) return
     state.way = { status: 'error', message: (err as Error).message, id }
-    roadMap.showWay(null)
   }
+  showCurrentWay()
   render()
 }
 
@@ -293,12 +320,11 @@ async function loadWayNear([lon, lat]: [number, number], showTab = true) {
     if (!near || near.distanceM > 25) throw new Error('No OSM road within 25 m of the click.')
     wayCache.set(near.way.id, near.way)
     state.way = { status: 'done', value: near.way, id: near.way.id }
-    roadMap.showWay(near.way)
   } catch (err) {
     if (ac.signal.aborted) return
     state.way = { status: 'error', message: (err as Error).message }
-    roadMap.showWay(null)
   }
+  showCurrentWay()
   render()
 }
 

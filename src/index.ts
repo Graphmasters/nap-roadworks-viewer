@@ -32,6 +32,7 @@ export {
 export {
   matchEvent,
   linesOf,
+  recordWayOrientation,
   WEIGHTS,
   AMBIGUITY_MARGIN,
   MERGED_PENALTY,

@@ -2,7 +2,7 @@
 // (concept §4.6, §5.5). DATEX II describes a temporary state; OSM describes the usual layout, so
 // a difference is a hint to look closer, not an error.
 
-import { interpretLanes } from 'osm-lanes'
+import { interpretLanes, reverseRoadLanes } from 'osm-lanes'
 import type { RoadEvent, Severity } from '../model'
 import { laneEvidenceOf, type LaneCodeSummary } from './codes'
 
@@ -40,15 +40,20 @@ const int = (v: string | undefined) => {
   return Number.isFinite(n) ? n : undefined
 }
 
-export function osmLaneAttributes(osmType: OsmLaneAttributes['osmType'], osmId: string, tags: Record<string, string>): OsmLaneAttributes {
-  const road = interpretLanes(tags)
+/**
+ * Lane attributes of an OSM way. With `reverse`, "forward" means against the way's node order
+ * (e.g. the direction of a record that runs the other way).
+ */
+export function osmLaneAttributes(osmType: OsmLaneAttributes['osmType'], osmId: string, tags: Record<string, string>, options: { reverse?: boolean } = {}): OsmLaneAttributes {
+  const reverse = !!options.reverse
+  const road = reverse ? reverseRoadLanes(interpretLanes(tags)) : interpretLanes(tags)
   const oneway = road.oneway !== 'no'
   return {
     osmType,
     osmId,
     lanesTotal: int(tags['lanes']),
-    lanesForward: int(tags['lanes:forward']),
-    lanesBackward: int(tags['lanes:backward']),
+    lanesForward: int(tags[reverse ? 'lanes:backward' : 'lanes:forward']),
+    lanesBackward: int(tags[reverse ? 'lanes:forward' : 'lanes:backward']),
     oneWay: oneway,
     interpretedForward: road.forward.length,
     interpretedBackward: road.backward.length,

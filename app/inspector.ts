@@ -1,9 +1,9 @@
 // Right panel: context-sensitive inspector with tabs for the record, its XML, lanes, the
 // situation (passability), the selected OSM way and matching.
 
-import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
+import { interpretLanes, renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
-import { compareLanes, describeOpenlr, laneCategoriesOf, osmLaneAttributes, validWgs84, WEIGHTS, type AnalysisResult, type OpenlrReference, type RefinedMatchResult, type RoadEvent } from '../src/index'
+import { compareLanes, describeOpenlr, laneCategoriesOf, linesOf, osmLaneAttributes, recordWayOrientation, validWgs84, WEIGHTS, type AnalysisResult, type OpenlrReference, type RefinedMatchResult, type RoadEvent } from '../src/index'
 import { append, badge, clear, dl, formatTime, h, link, spinner, type Child } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
@@ -25,6 +25,38 @@ export interface InspectorState {
   overpass?: string
   /** OSM ways loaded so far (OSM tab, matching), by way id. */
   ways?: ReadonlyMap<string, OsmWay>
+  /** Direction of the selected record relative to the loaded way's node order (0: unknown). */
+  orientation: 1 | -1 | 0
+  /**
+   * The loaded way is shown against its node order (map, lane diagram, destination sign, compass):
+   * a one-way way is always shown in its travel direction (so `oneway=-1` is reversed), a two-way
+   * way in the direction of the record when it runs against the node order.
+   */
+  wayReversed: boolean
+}
+
+/**
+ * Whether to show a way against its node order for a record running in `orientation` relative to
+ * it. One-way ways follow their travel direction whatever the record does, so a record against
+ * the traffic stays visible; two-way ways follow the record.
+ */
+export function showReversed(way: OsmWay, orientation: 1 | -1 | 0): boolean {
+  const oneway = interpretLanes(way.tags).oneway
+  return oneway === 'no' ? orientation === -1 : oneway === '-1'
+}
+
+/** A note when the record runs against the travel direction of a one-way way. */
+function onewayConflict(way: OsmWay, orientation: 1 | -1 | 0): string | undefined {
+  const oneway = interpretLanes(way.tags).oneway
+  if ((orientation === -1 && oneway === 'yes') || (orientation === 1 && oneway === '-1'))
+    return 'The record runs against the travel direction of this one-way way. The way is shown in its travel direction, so its map arrows point against the record\'s.'
+  return undefined
+}
+
+/** Where the lane diagram's "up" points, for captions. */
+function directionText(way: OsmWay, reversed: boolean): string {
+  if (!reversed) return 'in way direction'
+  return interpretLanes(way.tags).oneway === '-1' ? 'in travel direction (oneway=-1: against the OSM way\'s node order)' : 'in record direction (against the OSM way\'s node order)'
 }
 
 /** What OSM data is being fetched right now, if any. */
@@ -238,22 +270,23 @@ function renderLanes(el: HTMLElement, s: InspectorState, e: RoadEvent) {
   }
   if (s.way.status !== 'done') {
     append(el, 
-      h('p', { class: s.way.status === 'error' ? 'error' : 'muted' }, s.way.status === 'error' ? `Could not load the OSM way: ${s.way.message}` : 'No OSM way selected. Run Matching, or switch to "Select OSM road" and click a road.'),
+      h('p', { class: s.way.status === 'error' ? 'error' : 'muted' }, s.way.status === 'error' ? `Could not load the OSM way: ${s.way.message}` : 'No OSM way selected. Matching runs when a record with a line is selected; or switch to "Select OSM road" and click a road.'),
     )
     return
   }
   const way = s.way.value
   append(el, 
     h('p', null, link(`https://www.openstreetmap.org/way/${way.id}`, `way/${way.id}`), way.tags['ref'] ? ` · ${way.tags['ref']}` : '', way.tags['name'] ? ` · ${way.tags['name']}` : ''),
-    osmLaneFigure(way, { showSigns: false, caption: 'Usual layout according to OSM (osm-lanes), in way direction' }) ?? h('p', { class: 'muted' }, 'No lane diagram for this way.'),
+    directionNote(way, s),
+    osmLaneFigure(way, { showSigns: false, reverse: s.wayReversed, caption: `Usual layout according to OSM (osm-lanes), ${directionText(way, s.wayReversed)}` }) ?? h('p', { class: 'muted' }, 'No lane diagram for this way.'),
   )
   const matched = s.match.status === 'done' ? s.match.value.ranked.find((r) => r.candidate.osmWayId === way.id || r.candidate.key === s.confirmedKey) : undefined
-  const cmp = compareLanes(e, osmLaneAttributes('way', way.id, way.tags), matched?.quality)
+  const cmp = compareLanes(e, osmLaneAttributes('way', way.id, way.tags, { reverse: s.wayReversed }), matched?.quality)
   append(el, 
     h('h3', null, 'Comparison'),
     dl([
       ['DATEX II', cmp.datex ? `${cmp.datex.drivingLanes} driving lane(s): ${cmp.datex.openLanes} open, ${cmp.datex.restrictedLanes} narrowed, ${cmp.datex.closedLanes} closed (${cmp.datex.field})` : 'no lane status'],
-      ['OSM', `lanes=${cmp.osm.lanesTotal ?? '–'}, forward ${cmp.osm.interpretedForward}, backward ${cmp.osm.interpretedBackward}${cmp.osm.oneWay ? ', one-way' : ''}`],
+      ['OSM', `lanes=${cmp.osm.lanesTotal ?? '–'}, forward ${cmp.osm.interpretedForward}, backward ${cmp.osm.interpretedBackward}${cmp.osm.oneWay ? ', one-way' : ''}${s.wayReversed ? ' (forward = direction shown, against the way\'s node order)' : ''}`],
       ['Assessment', h('strong', null, cmp.assessment)],
     ]),
     h('ul', { class: 'compact' }, ...cmp.indicators.map((i) => h('li', null, badge(i.severity, i.severity), ' ', i.message))),
@@ -352,6 +385,12 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
   // Candidate keys break after each "/" so the table fits the side panel.
   const keyText = (key: string): Child[] => key.split('/').flatMap((p, i, a) => (i < a.length - 1 ? [`${p}/`, h('wbr')] : [p]))
   const seq = new Set(m.sequence.map((x) => x.candidate.key))
+  const loaded = (id: string | undefined) => (id ? s.ways?.get(id) : undefined)
+  const lines = linesOf(e.geometry)
+  // Tiny lane graphics are turned like the Lanes tab: one-way ways by their tags, two-way ways
+  // once their geometry is known.
+  const candidateReversed = (tags: Record<string, string> | undefined, way: OsmWay | undefined) =>
+    !!tags && showReversed({ type: 'way', id: '', tags }, way?.geometry ? recordWayOrientation(lines, way.geometry.map((p) => [p.lon, p.lat])) : 0)
   for (const r of m.ranked.slice(0, 15)) {
     const c = r.candidate
     const pct = (v: number) => `${Math.round(v * 100)}`
@@ -367,7 +406,7 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
         h('td', null, pct(r.components.distance)),
         h('td', null, pct(r.components.bearing)),
         h('td', null, r.components.ref === 0.5 ? '–' : pct(r.components.ref)),
-        h('td', { class: 'cand-lanes' }, candidateLanes(c.tags ?? (c.osmWayId ? s.ways?.get(c.osmWayId)?.tags : undefined))),
+        h('td', { class: 'cand-lanes' }, candidateLanes(c.tags ?? loaded(c.osmWayId)?.tags, candidateReversed(c.tags ?? loaded(c.osmWayId)?.tags, loaded(c.osmWayId)))),
       ),
     )
   }
@@ -375,9 +414,9 @@ function renderMatch(el: HTMLElement, s: InspectorState, e: RoadEvent, cb: Inspe
 }
 
 /** Tiny OSM lane graphic for the candidate table, or a dash when the way's tags are not loaded. */
-function candidateLanes(tags: Record<string, string> | undefined): Node | string {
+function candidateLanes(tags: Record<string, string> | undefined, reverse: boolean): Node | string {
   if (!tags) return h('span', { class: 'muted', title: 'OSM data not loaded yet' }, '·')
-  const svg = renderLanesElement(tags, { showSigns: false })
+  const svg = renderLanesElement(tags, { showSigns: false, reverse })
   if (!svg) return h('span', { class: 'muted', title: 'No lane tags in OSM' }, '–')
   const [, , w, hgt] = (svg.getAttribute('viewBox') ?? '0 0 1 1').split(/\s+/).map(Number)
   const height = 22
@@ -385,7 +424,7 @@ function candidateLanes(tags: Record<string, string> | undefined): Node | string
   svg.setAttribute('width', String(Math.max(8, Math.round((height * (w || 1)) / (hgt || 1)))))
   svg.classList.add('lanes-tiny')
   const title = document.createElementNS('http://www.w3.org/2000/svg', 'title')
-  title.textContent = [tags['lanes'] ? `lanes=${tags['lanes']}` : '', tags['turn:lanes'] ? `turn:lanes=${tags['turn:lanes']}` : ''].filter(Boolean).join(', ') || 'OSM lanes'
+  title.textContent = ([tags['lanes'] ? `lanes=${tags['lanes']}` : '', tags['turn:lanes'] ? `turn:lanes=${tags['turn:lanes']}` : ''].filter(Boolean).join(', ') || 'OSM lanes') + (reverse ? ' (drawn in record direction)' : '')
   svg.prepend(title)
   return svg
 }
@@ -395,16 +434,26 @@ function candidateLanes(tags: Record<string, string> | undefined): Node | string
  * direction ("up"); the compass shows where that points, and the map highlight carries matching
  * arrows. Without lanes to draw, the compass is shown alone; without geometry, nothing.
  */
-function osmLaneFigure(way: OsmWay, opts: { showSigns?: boolean; caption: string }): HTMLElement | null {
-  const lanes = renderLanesElement(way, { showSigns: opts.showSigns })
-  const compass = renderCompassElement(wayBearing(way.geometry))
+function osmLaneFigure(way: OsmWay, opts: { showSigns?: boolean; reverse?: boolean; caption: string }): HTMLElement | null {
+  const lanes = renderLanesElement(way, { showSigns: opts.showSigns, reverse: opts.reverse })
+  const bearing = wayBearing(way.geometry)
+  const compass = renderCompassElement(bearing !== null && opts.reverse ? (bearing + 180) % 360 : bearing)
   if (!lanes && !compass) return null
   return h(
     'figure',
     { class: 'lane-fig' },
     h('div', { class: 'lanes-row' }, lanes, compass),
-    h('figcaption', null, lanes ? `${opts.caption}${compass ? '; compass and map arrows show that direction' : ''}` : 'Way direction (no lanes to draw; map arrows show the same direction)'),
+    h('figcaption', null, lanes ? `${opts.caption}${compass ? '; compass and map arrows show that direction' : ''}` : `Shown ${directionText(way, !!opts.reverse)} (no lanes to draw; map arrows show the same direction)`),
   )
+}
+
+/** How the selected record runs relative to the way, when that is known. */
+function directionNote(way: OsmWay, s: InspectorState): HTMLElement | null {
+  if (s.index === null || !s.orientation) return null
+  const conflict = onewayConflict(way, s.orientation)
+  if (conflict) return h('p', { class: 'warning' }, conflict)
+  if (s.wayReversed && interpretLanes(way.tags).oneway === 'no') return h('p', { class: 'muted' }, 'The record runs against the node order of this two-way way, so the way is shown reversed: map arrows, lane diagram, destination sign and compass follow the record.')
+  return null
 }
 
 function renderOsm(el: HTMLElement, s: InspectorState, e: RoadEvent | undefined) {
@@ -423,13 +472,14 @@ function renderOsm(el: HTMLElement, s: InspectorState, e: RoadEvent | undefined)
   }
   const way = s.way.value
   const t = way.tags
-  const dest = renderDestinationSignElement(way)
+  const dest = renderDestinationSignElement(way, { reverse: s.wayReversed })
   append(el, 
     h('h2', null, t['name'] || t['ref'] || `Way ${way.id}`),
     h('p', null, link(`https://www.openstreetmap.org/way/${way.id}`, `way/${way.id}`), way.version ? ` · version ${way.version}` : '', way.timestamp ? ` · edited ${formatTime(way.timestamp)}` : '', prov('OSM API')),
     h('p', { class: 'muted' }, 'Tags come from the live OSM API; the map tiles may be older.'),
-    dest ? h('figure', { class: 'lane-fig' }, dest, h('figcaption', null, 'Destination sign (destination:lanes)')) : null,
-    osmLaneFigure(way, { caption: 'Lanes in way direction (osm-lanes)' }),
+    e ? directionNote(way, s) : null,
+    dest ? h('figure', { class: 'lane-fig' }, dest, h('figcaption', null, `Destination sign (destination:lanes), ${directionText(way, s.wayReversed)}`)) : null,
+    osmLaneFigure(way, { reverse: s.wayReversed, caption: `Lanes ${directionText(way, s.wayReversed)} (osm-lanes)` }),
   )
   const rows = Object.keys(t)
     .sort()

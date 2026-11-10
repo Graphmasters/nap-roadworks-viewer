@@ -8,7 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { decodeTileFeatureId, type OsmWay } from 'osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
-import { validWgs84, type LonLat, type MatchResult, type RecordPassability, type RoadEvent } from '../src/index'
+import { linesOf, validWgs84, type LonLat, type MatchResult, type RecordPassability, type RoadEvent } from '../src/index'
 import { readRoadCandidates, type TileRead } from './tiles'
 
 // MapLibre 6 resolves its worker file at runtime, which bundlers cannot follow; hand it the
@@ -41,13 +41,15 @@ const ROAD_CLASSES = new Set([
 ])
 
 const DIRECTION_ICON = 'nrv-way-direction'
+const RECORD_DIRECTION_ICON = (type: RoadEvent['type']) => `nrv-record-direction-${type}`
 
 /**
  * A chevron pointing right (+x), drawn on a canvas so the style needs no sprite. Symbols placed
- * along a line turn +x into the line direction, so the chevrons follow the way's node order.
- * Same design as the osm-lanes demo; dark blue to match the way highlight.
+ * along a line turn +x into the line direction, so the chevrons follow the line's vertex order.
+ * Same design as the osm-lanes demo: dark blue for the way highlight, the record type colour for
+ * the selected record.
  */
-function directionIcon(): ImageData {
+function directionIcon(color = '#0b3d91'): ImageData {
   const px = 48
   const ctx = document.createElement('canvas').getContext('2d')!
   ctx.canvas.width = ctx.canvas.height = px
@@ -60,7 +62,7 @@ function directionIcon(): ImageData {
     ctx.lineTo(px * 0.32, px * 0.82)
     ctx.stroke()
   }
-  ctx.strokeStyle = '#0b3d91'
+  ctx.strokeStyle = color
   ctx.lineWidth = px * 0.26
   chevron()
   ctx.strokeStyle = '#ffffff'
@@ -90,8 +92,17 @@ const EVENTS = 'nrv-events'
 const SEL: maplibregl.ExpressionSpecification = ['boolean', ['feature-state', 'selected'], false]
 const WAY = 'nrv-way'
 const CANDIDATES = 'nrv-candidates'
-/** The selected record's polyline, for direction chevrons. */
-const DETAIL = 'nrv-detail'
+/** The selected record's lines, for its direction chevrons (layout filters cannot read feature-state). */
+const SELECTED = 'nrv-selected'
+
+const DIRECTION_LAYOUT = {
+  'symbol-placement': 'line',
+  'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 10, 50, 14, 70, 18, 140],
+  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 0.7, 18, 1.3],
+  'icon-rotation-alignment': 'map',
+  'icon-allow-overlap': true,
+  'icon-ignore-placement': true,
+} satisfies maplibregl.SymbolLayerSpecification['layout']
 /** The selected record's decoded OpenLR location reference points. */
 const OPENLR = 'nrv-openlr'
 const OPENLR_COLOR = '#0f766e'
@@ -137,7 +148,7 @@ export class RoadworksMap {
     this.map.addSource(WAY, { type: 'geojson', data: empty })
     this.map.addSource(CANDIDATES, { type: 'geojson', data: empty })
     this.map.addSource(EVENTS, { type: 'geojson', data: empty, promoteId: 'i' })
-    this.map.addSource(DETAIL, { type: 'geojson', data: empty })
+    this.map.addSource(SELECTED, { type: 'geojson', data: empty })
     this.map.addSource(OPENLR, { type: 'geojson', data: empty })
 
     this.map.addLayer({
@@ -194,6 +205,18 @@ export class RoadworksMap {
         'circle-stroke-color': ['match', ['get', 't'], 'fullClosure', TYPE_COLORS.fullClosure, 'partialClosure', TYPE_COLORS.partialClosure, 'roadworks', TYPE_COLORS.roadworks, TYPE_COLORS.unknown],
       },
     })
+    // Chevrons along the selected record show the direction of its line (vertex order).
+    for (const type of Object.keys(TYPE_COLORS) as RoadEvent['type'][])
+      if (!this.map.hasImage(RECORD_DIRECTION_ICON(type))) this.map.addImage(RECORD_DIRECTION_ICON(type), directionIcon(TYPE_COLORS[type]), { pixelRatio: 2 })
+    this.map.addLayer({
+      id: `${SELECTED}-direction`,
+      type: 'symbol',
+      source: SELECTED,
+      layout: {
+        ...DIRECTION_LAYOUT,
+        'icon-image': ['match', ['get', 't'], 'fullClosure', RECORD_DIRECTION_ICON('fullClosure'), 'partialClosure', RECORD_DIRECTION_ICON('partialClosure'), 'roadworks', RECORD_DIRECTION_ICON('roadworks'), RECORD_DIRECTION_ICON('unknown')],
+      },
+    })
     this.map.addLayer({
       id: `${WAY}-casing`,
       type: 'line',
@@ -208,38 +231,20 @@ export class RoadworksMap {
       paint: { 'line-color': '#1a73e8', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 4, 18, 10] },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
-    // Chevrons along the selected way show its drawing direction: "up" in the osm-lanes graphic,
-    // and the direction the compass rose in the Lanes and OSM tabs points to.
+    // Chevrons along the selected way show the direction it is drawn in: "up" in the osm-lanes
+    // graphic, and the direction the compass rose in the Lanes and OSM tabs points to. That is the
+    // way's node order, or the reverse: the travel direction of a oneway=-1 way, or the record's
+    // direction on a two-way road that the record runs against.
     if (!this.map.hasImage(DIRECTION_ICON)) this.map.addImage(DIRECTION_ICON, directionIcon(), { pixelRatio: 2 })
     this.map.addLayer({
       id: `${WAY}-direction`,
       type: 'symbol',
       source: WAY,
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 10, 50, 14, 70, 18, 140],
-        'icon-image': DIRECTION_ICON,
-        'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 0.7, 18, 1.3],
-        'icon-rotation-alignment': 'map',
-        'icon-allow-overlap': true,
-        'icon-ignore-placement': true,
-      },
+      layout: { ...DIRECTION_LAYOUT, 'icon-image': DIRECTION_ICON },
     })
-    // Selected record: chevrons along its polyline show the vertex order; OpenLR LRPs on top.
-    this.map.addLayer({
-      id: `${DETAIL}-direction`,
-      type: 'symbol',
-      source: DETAIL,
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 10, 40, 14, 60, 18, 120],
-        'icon-image': DIRECTION_ICON,
-        'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.45, 14, 0.6, 18, 1.1],
-        'icon-rotation-alignment': 'map',
-        'icon-allow-overlap': true,
-        'icon-ignore-placement': true,
-      },
-    })
+    // The record chevrons go on top: the matched way usually covers the record line.
+    this.map.moveLayer(`${SELECTED}-direction`)
+    // Decoded OpenLR points of the selected record, above everything else.
     this.map.addLayer({
       id: `${OPENLR}-line`,
       type: 'line',
@@ -262,14 +267,9 @@ export class RoadworksMap {
     this.updateHint()
   }
 
-  /** Shows the selected record's polyline direction and its decoded OpenLR LRPs; null clears both. */
+  /** Shows the selected record's decoded OpenLR location reference points; null clears them. */
   async showDetail(e: RoadEvent | null) {
     await this.ready
-    const lines: Feature[] = []
-    const g = e?.geometry
-    if (g?.type === 'LineString') lines.push({ type: 'Feature', properties: {}, geometry: g })
-    else if (g?.type === 'MultiLineString') for (const c of g.coordinates) lines.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } })
-    ;(this.map.getSource(DETAIL) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines })
     const features: Feature[] = []
     for (const r of e?.openlr ?? []) {
       const pts = r.lrps.filter(validWgs84).map((p) => [p.lon, p.lat] as [number, number])
@@ -312,6 +312,16 @@ export class RoadworksMap {
     })
     ;(this.map.getSource(EVENTS) as GeoJSONSource).setData({ type: 'FeatureCollection', features })
     if (this.selected !== null) this.map.setFeatureState({ source: EVENTS, id: this.selected }, { selected: true })
+    this.showSelectedLine()
+  }
+
+  /** The selected record's line(s), for its direction chevrons. */
+  private showSelectedLine() {
+    const e = this.selected === null ? undefined : this.events[this.selected]
+    ;(this.map.getSource(SELECTED) as GeoJSONSource | undefined)?.setData({
+      type: 'FeatureCollection',
+      features: linesOf(e?.geometry).map((l) => ({ type: 'Feature', properties: { t: e!.type }, geometry: { type: 'LineString', coordinates: l } })),
+    })
   }
 
   fitEvents(events: RoadEvent[]) {
@@ -329,6 +339,7 @@ export class RoadworksMap {
   select(index: number | null, fit: boolean) {
     if (this.selected !== null && this.map.getSource(EVENTS)) this.map.setFeatureState({ source: EVENTS, id: this.selected }, { selected: false })
     this.selected = index
+    this.showSelectedLine()
     if (index === null) return
     if (this.map.getSource(EVENTS)) this.map.setFeatureState({ source: EVENTS, id: index }, { selected: true })
     const e = this.events[index]
@@ -342,9 +353,11 @@ export class RoadworksMap {
     }
   }
 
-  showWay(way: OsmWay | null) {
+  /** Highlights a way; `reversed` draws it (and its chevrons) against its node order. */
+  showWay(way: OsmWay | null, reversed = false) {
     const src = this.map.getSource(WAY) as GeoJSONSource | undefined
     const coords = (way?.geometry ?? []).map((p) => [p.lon, p.lat])
+    if (reversed) coords.reverse()
     src?.setData({
       type: 'FeatureCollection',
       features: coords.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }] : [],
