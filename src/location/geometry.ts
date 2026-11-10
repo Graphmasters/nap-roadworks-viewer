@@ -75,15 +75,28 @@ function toLonLat(flat: number[], order: AxisOrder): Array<[number, number]> | u
 export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisOrder): void {
   event.warnings.push(...g.warnings)
   const lines: Array<Array<[number, number]>> = []
+  let zeroLength: [number, number] | undefined
   for (const flat of g.lines) {
     const coords = toLonLat(flat, order)
-    if (coords) lines.push(coords)
-    else event.warnings.push('gmlLineString has coordinates outside the WGS 84 range')
+    if (!coords) event.warnings.push('gmlLineString has coordinates outside the WGS 84 range')
+    // All positions the same: no length, nothing a line layer can draw. Shown as a point instead.
+    else if (coords.every(([x, y]) => x === coords[0]![0] && y === coords[0]![1])) zeroLength ??= coords[0]
+    else lines.push(coords)
+  }
+  if (zeroLength) {
+    event.zeroLengthLine = [zeroLength[1], zeroLength[0]]
+    if (lines.length) event.warnings.push('A gmlLineString has zero length (all positions are the same point) and is not drawn.')
   }
   if (lines.length) {
     event.geometry = lines.length === 1 ? { type: 'LineString', coordinates: lines[0]! } : { type: 'MultiLineString', coordinates: lines }
     event.geometryConfidence = 'direct'
     event.geometryNote = `Line geometry taken directly from DATEX II (gmlLineString, read as ${order === 'latlon' ? 'lat lon' : 'lon lat'}).`
+    return
+  }
+  if (zeroLength) {
+    event.geometry = { type: 'Point', coordinates: zeroLength }
+    event.geometryConfidence = 'approximate'
+    event.geometryNote = `The gmlLineString has zero length: all its positions are ${zeroLength[1]} ${zeroLength[0]} (lat lon). Drawn as a point; the extent of the restriction is not represented.`
     return
   }
   const pts = g.points.filter(([lat, lon]) => Math.abs(lat) <= 90 && Math.abs(lon) <= 180).map(([lat, lon]) => [round(lon), round(lat)] as [number, number])

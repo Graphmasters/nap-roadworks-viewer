@@ -200,6 +200,10 @@ export interface RoadEvent {
   linearElementKind?: string
   /** Largest number of significant decimals in the record's coordinate text. */
   coordinateDecimals?: number
+  /** `lengthAffected` in metres (supplementaryPositionalDescription), when given. */
+  lengthAffected?: number
+  /** Set when a gmlLineString has zero length (all positions equal): that position as [lat, lon]. */
+  zeroLengthLine?: [lat: number, lon: number]
   /** Explicit latitude/longitude points of the record (pointCoordinates, display points). */
   referencePoints: Array<[lat: number, lon: number]>
   /** OpenLR references in the location (decoded when structured). */

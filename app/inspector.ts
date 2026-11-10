@@ -135,6 +135,7 @@ function renderRecord(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
       ['Validity', [e.validityStatus, e.hasPeriods ? ' · restricted periods' : ''].join('') || undefined],
       ['Road', [e.roadNumber, e.roadName].filter(Boolean).join(' · ') || undefined],
       ['Carriageway', e.carriageway],
+      ['Length affected', e.lengthAffected !== undefined ? `${e.lengthAffected.toLocaleString('en')} m` : undefined],
       ['Direction', e.direction],
       ['Work type', e.workTypes.join(', ') || undefined],
       ['Lane detail', laneDetailText(e) || undefined],

@@ -358,7 +358,8 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         })
       if (poly.line && poly.defects.length)
         add('RTTI-LIN-02', 'warning', `Polyline defects: ${poly.defects.join(', ')}.`, e)
-      const zero = !line && !projected ? poly.zeroLength : undefined
+      // Zero-length lines are drawn as points (applyGeometry); the record keeps the position.
+      const zero = !line && !projected ? (poly.zeroLength ?? (e.zeroLengthLine ? ([e.zeroLengthLine[1], e.zeroLengthLine[0]] as LonLat) : undefined)) : undefined
       if (zero)
         add('RTTI-LIN-01', 'warning', 'The gmlLineString has zero length: all its positions are the same point.', e, {
           explanation: `Every position in the posList is ${zero[1]} ${zero[0]} (lat lon), so the line has no length and no direction: it is a point written as a line. Linear referencing needs at least two distinct positions along the affected section.${

@@ -207,7 +207,20 @@ describe('RTTI direction sub-criterion', () => {
   })
 
   it('names a zero-length gmlLineString instead of reporting a missing polyline', async () => {
-    const r = await run(v2Doc(v2Situation('Z-1', v2Record('Z-1-W', line('53.728949 10.260071 53.728949 10.260071')))))
+    const r = await run(
+      v2Doc(
+        v2Situation(
+          'Z-1',
+          v2Record(
+            'Z-1-W',
+            `<supplementaryPositionalDescription><affectedCarriagewayAndLanes><carriageway>mainCarriageway</carriageway><lengthAffected>0.0</lengthAffected></affectedCarriagewayAndLanes></supplementaryPositionalDescription>${line('53.728949 10.260071 53.728949 10.260071')}`,
+          ),
+        ),
+      ),
+    )
+    // Drawn as a point: a zero-length line renders as nothing on the map.
+    expect(r.events[0]).toMatchObject({ geometry: { type: 'Point', coordinates: [10.260071, 53.728949] }, geometryConfidence: 'approximate', zeroLengthLine: [53.728949, 10.260071], lengthAffected: 0 })
+    expect(r.events[0]!.geometryNote).toContain('zero length')
     const f = r.findings.find((x) => x.ruleId === 'RTTI-LIN-01')!
     expect(f.recordIds).toEqual(['Z-1-W'])
     expect(f.message).toContain('zero length')

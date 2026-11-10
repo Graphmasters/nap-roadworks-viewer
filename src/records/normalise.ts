@@ -320,6 +320,7 @@ function normaliseRecord(
     temporarySpeedLimit: num(deepestText(rec, 'temporarySpeedLimit')),
     generalNetworkManagementTypes: textsOf(rec, 'generalNetworkManagementType'),
     vehicleCharacteristics: vehicleCharacteristicsOf(rec),
+    lengthAffected: num(deepestText(location, 'lengthAffected')),
     directionRelative: deepestText(location, 'directionRelativeOnLinearSection'),
     directionBound: deepestText(location, 'directionBoundOnLinearSection'),
     alertCAffectedDirection: deepestText(location, 'alertCAffectedDirection'),
