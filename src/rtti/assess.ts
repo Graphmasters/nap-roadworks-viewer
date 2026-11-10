@@ -63,6 +63,8 @@ interface Facts {
   line?: LonLat[]
   /** Where the polyline comes from: a gmlLineString, or the LRPs of a structured OpenLR line. */
   lineSource?: 'gml' | 'openlr'
+  /** A gmlLineString whose positions all coincide (zero length): a point written as a line. */
+  zeroLength?: LonLat
   /** A gmlLineString exists but not in WGS 84 degrees (e.g. a projected CRS): a polyline the viewer cannot read. */
   projected: boolean
   locLevel: number
@@ -83,10 +85,14 @@ function capIds(ids: Iterable<string>): { recordIds: string[]; recordCount: numb
   return { recordIds: all.slice(0, MAX_IDS), recordCount: all.length }
 }
 
-/** Longest line of the record with at least two distinct vertices (duplicates removed). */
-function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[] } {
+/**
+ * Longest line of the record with at least two distinct vertices (duplicates removed). A line
+ * whose positions all coincide has no length and no direction and is returned as `zeroLength`.
+ */
+function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[]; zeroLength?: LonLat } {
   const defects: string[] = []
   let best: LonLat[] | undefined
+  let zeroLength: LonLat | undefined
   for (const raw of linesOf(e.geometry)) {
     const line: LonLat[] = []
     let dup = 0
@@ -98,6 +104,7 @@ function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[] } {
     if (dup) defects.push(`${dup} consecutive duplicate vertex${dup === 1 ? '' : 'es'}`)
     if (line.length < 2) {
       defects.push('fewer than two distinct vertices')
+      zeroLength ??= line[0]
       continue
     }
     let spikes = 0
@@ -110,7 +117,7 @@ function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[] } {
     if (spikes) defects.push(`${spikes} turn-back spike${spikes === 1 ? '' : 's'} (>170°)`)
     if (!best || line.length > best.length) best = line
   }
-  return { line: best, defects }
+  return { line: best, defects, zeroLength: best ? undefined : zeroLength }
 }
 
 /**
@@ -351,7 +358,15 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         })
       if (poly.line && poly.defects.length)
         add('RTTI-LIN-02', 'warning', `Polyline defects: ${poly.defects.join(', ')}.`, e)
-      if (!line && !projected)
+      const zero = !line && !projected ? poly.zeroLength : undefined
+      if (zero)
+        add('RTTI-LIN-01', 'warning', 'The gmlLineString has zero length: all its positions are the same point.', e, {
+          explanation: `Every position in the posList is ${zero[1]} ${zero[0]} (lat lon), so the line has no length and no direction: it is a point written as a line. Linear referencing needs at least two distinct positions along the affected section.${
+            olr.excluded ? ` The OpenLR line does not count either, because ${olr.excluded}.` : ''
+          }`,
+          rawValue: `${zero[1]} ${zero[0]}`,
+        })
+      else if (!line && !projected)
         add('RTTI-LIN-01', 'warning', 'No polyline: linear referencing (polylines) is required at every star level.', e, {
           explanation: `Location methods: ${e.locationMethods.join(', ') || 'none'}. ${
             olr.excluded ? `The OpenLR line does not count because ${olr.excluded}.` : 'A gmlLineString or a structured OpenLR line counts; ALERT-C, points and binary OpenLR do not.'
@@ -378,7 +393,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           }
         }
       const resolutionM = e.coordinateDecimals !== undefined ? 0.5 * 10 ** -e.coordinateDecimals * M_PER_DEG : undefined
-      return { e, line, lineSource, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
+      return { e, line, lineSource, zeroLength: zero, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
     })
 
     const criteria: RttiCriterionResult[] = []
@@ -509,9 +524,13 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           { label: 'gmlLineString', count: facts.filter((f) => f.lineSource === 'gml').length },
           { label: 'OpenLR line', count: fromOpenlr },
           { label: 'gmlLineString, not WGS 84', count: projected },
-          { label: 'no polyline', count: missing.length },
+          { label: 'gmlLineString of zero length', count: missing.filter((f) => f.zeroLength).length },
+          { label: 'no polyline', count: missing.filter((f) => !f.zeroLength).length },
         ].filter((d) => d.count),
-        notes: ['A structured OpenLR line counts as a polyline when its points are valid WGS 84 positions at most 15 km apart (the OpenLR maximum).'],
+        notes: [
+          'A gmlLineString needs at least two distinct positions; one whose positions all coincide has zero length and counts as no polyline.',
+          'A structured OpenLR line counts as a polyline when its points are valid WGS 84 positions at most 15 km apart (the OpenLR maximum).',
+        ],
         ...capIds(missing.map((f) => f.e.id)),
         ruleIds: ['RTTI-LIN-01', 'RTTI-LIN-02', 'RTTI-LIN-03'],
       })

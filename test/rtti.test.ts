@@ -206,6 +206,16 @@ describe('RTTI direction sub-criterion', () => {
     expect(code.explanation).toContain(RTTI_SPEC_URL)
   })
 
+  it('names a zero-length gmlLineString instead of reporting a missing polyline', async () => {
+    const r = await run(v2Doc(v2Situation('Z-1', v2Record('Z-1-W', line('53.728949 10.260071 53.728949 10.260071')))))
+    const f = r.findings.find((x) => x.ruleId === 'RTTI-LIN-01')!
+    expect(f.recordIds).toEqual(['Z-1-W'])
+    expect(f.message).toContain('zero length')
+    expect(f.explanation).toContain('53.728949 10.260071')
+    expect(criterion(r, 'plannedRoadworks', 'linearReferencing').distribution).toEqual([{ label: 'gmlLineString of zero length', count: 1 }])
+    expect(ceiling(r, 'plannedRoadworks', 'linearReferencing')).toBe(0)
+  })
+
   it('counts a polyline in a projected CRS but does not check its direction', async () => {
     const utm = `<linearExtension><linearExtended><gmlLineString srsName="25833"><posList>328036.75 7104847.08 328093.1 7104801.7 328131.3 7104772</posList></gmlLineString></linearExtended></linearExtension>`
     const r = await run(v2Doc(v2Situation('P-1', v2Record('P-1-W', utm))))
