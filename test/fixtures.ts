@@ -199,6 +199,8 @@ export const V2_OPENLR = v2Doc(
   ),
   v2Situation('H-DNP', v2Record('H-DNP-R', v2OpenlrLine(v2Lrp(45.5, 15.999, 500) + v2Lrp(45.5, 16.03, undefined, true)))),
   v2Situation('H-NOLAST', v2Record('H-NOLAST-R', v2OpenlrLine(v2Lrp(45.5, 15.999, 1150) + v2Lrp(45.5, 16.015, 300)))),
+  // LRPs 15.6 km apart with a DNP above the OpenLR maximum of 15 km: not a usable polyline.
+  v2Situation('H-LONG', v2Record('H-LONG-R', v2OpenlrLine(v2Lrp(45.5, 15.9, 16000) + v2Lrp(45.5, 16.1, undefined, true)))),
 )
 
 // v3 ---------------------------------------------------------------------------------------------

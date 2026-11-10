@@ -11,6 +11,12 @@ import {
   v2Doc,
   v2Record,
   v2Situation,
+  gml,
+  LINE_E,
+  v3Doc,
+  v3Lrp,
+  v3Record,
+  v3Situation,
 } from './fixtures'
 
 const run = (xml: string) => analyseDatex(sourceFromBytes(xml))
@@ -46,7 +52,7 @@ describe('OpenLR decoding', () => {
     const e = r.events.find((x) => x.id === 'H-BIN-R')!
     expect(e.openlr).toEqual([expect.objectContaining({ encoding: 'binary', kind: 'unknown', lrps: [] })])
     expect(e.locationMethods).toContain('OpenLR (binary)')
-    expect(r.rtti!.openlr).toMatchObject({ records: 9, recordsWithOpenlr: 9, structured: 8, binary: 1, lines: 7, points: 1 })
+    expect(r.rtti!.openlr).toMatchObject({ records: 10, recordsWithOpenlr: 10, structured: 9, binary: 1, lines: 8, points: 1 })
   })
 
   it('reports OpenLR presence for feeds without OpenLR', async () => {
@@ -69,7 +75,8 @@ describe('OpenLR decoding', () => {
     expect(recordsWith(r, 'OLR-001')).toEqual(['H-NAN-R'])
     expect(recordsWith(r, 'OLR-003')).toEqual(['H-SWAP-R'])
     expect(recordsWith(r, 'OLR-005')).toEqual(['H-DNP-R'])
-    expect(recordsWith(r, 'OLR-006')).toEqual(['H-NOLAST-R'])
+    expect(recordsWith(r, 'OLR-006').sort()).toEqual(['H-LONG-R', 'H-NOLAST-R'])
+    expect(r.findings.find((f) => f.ruleId === 'OLR-006' && f.recordIds?.[0] === 'H-LONG-R')!.message).toContain('exceeds the OpenLR maximum of 15000 m')
     expect(rules(r).has('OLR-004')).toBe(false)
     // Swapped OpenLR does not flip the file's posList axis order.
     expect(r.meta.axisOrder.order).toBe('latlon')
@@ -211,10 +218,29 @@ describe('RTTI direction sub-criterion', () => {
     expect(r.events[0]!.coordinateDecimals).toBeUndefined()
   })
 
-  it('does not evaluate direction for OpenLR-only records without a polyline', async () => {
+  it('counts a structured OpenLR line as a polyline unless its points are invalid or over 15 km apart', async () => {
+    const r = await run(V2_OPENLR)
+    const lin = criterion(r, 'plannedRoadworks', 'linearReferencing')
+    expect(Object.fromEntries(lin.distribution!.map((d) => [d.label, d.count]))).toEqual({ gmlLineString: 2, 'OpenLR line': 3, 'no polyline': 5 })
+    expect(recordsWith(r, 'RTTI-LIN-01').sort()).toEqual(['H-2-R', 'H-LONG-R', 'H-NAN-R', 'H-NULL-R', 'H-PROJ-R'])
+    const long = r.findings.find((f) => f.ruleId === 'RTTI-LIN-01' && f.recordIds?.[0] === 'H-LONG-R')!
+    expect(long.explanation).toContain('more than the OpenLR maximum of 15000 m')
+  })
+
+  it('takes the direction of an OpenLR-only line from its direction section', async () => {
     const r = await run(V2_OPENLR)
     const dir = criterion(r, 'plannedRoadworks', 'direction')
-    expect(dir.distribution!.find((d) => d.label === 'no polyline')!.count).toBe(7)
+    expect(Object.fromEntries(dir.distribution!.map((d) => [d.label, d.count]))).toEqual({ unambiguous: 3, ambiguous: 2, 'no polyline': 5 })
+    const limiting = new Set(dir.recordIds)
+    for (const ok of ['H-1-R', 'H-DNP-R', 'H-NOLAST-R']) expect(limiting.has(ok)).toBe(false)
     expect(recordsWith(r, 'RTTI-DIR-01').sort()).toEqual(['H-BIN-R', 'H-SWAP-R'])
+  })
+
+  it('reads OpenLR firstDirection plus oppositeDirection as both directions', async () => {
+    const both = `<loc:openlrLinear><loc:firstDirection>${v3Lrp(50, 7.999, 1150)}${v3Lrp(50, 8.015, undefined, true)}</loc:firstDirection><loc:oppositeDirection>${v3Lrp(50, 8.015, 1150)}${v3Lrp(50, 7.999, undefined, true)}</loc:oppositeDirection></loc:openlrLinear>`
+    const alertCBoth = `<loc:alertCLinear xsi:type="loc:AlertCMethod4Linear"><loc:alertCDirection><loc:alertCDirectionCoded>positive</loc:alertCDirectionCoded><loc:alertCAffectedDirection>both</loc:alertCAffectedDirection></loc:alertCDirection></loc:alertCLinear>`
+    const r = await run(v3Doc(v3Situation('B-1', v3Record('B-1-R', gml(LINE_E) + both + alertCBoth))))
+    expect(criterion(r, 'plannedRoadworks', 'direction').distribution).toEqual([{ label: 'unambiguous', count: 1 }])
+    expect(rules(r).has('RTTI-DIR-03')).toBe(false)
   })
 })

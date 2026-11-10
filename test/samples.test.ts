@@ -36,20 +36,25 @@ function openlrInvariants(r: AnalysisResult) {
 }
 
 describe.skipIf(!available)('real sample feeds (DATEX_SAMPLES_DIR)', () => {
-  it('HR v2 roadworks: structured OpenLR in extensions, no polyline', async () => {
+  it('HR v2 roadworks: structured OpenLR in extensions, OpenLR lines as polylines', async () => {
     const file = find('hr', 'npt-hak-roadworks')
     if (!file) return
     const r = await load(file)
     expect(r.meta.datexVersion).toBe('2')
     openlrInvariants(r)
-    const uc = r.rtti!.useCases.flatMap((u) => u.criteria)
-    expect(uc.filter((c) => c.id === 'linearReferencing').every((c) => c.ceiling === 0)).toBe(true)
-    for (const c of uc.filter((c) => c.id === 'direction')) expect(c.distribution).toEqual([{ label: 'no polyline', count: expect.any(Number) }])
+    const crit = (id: string) => r.rtti!.useCases.flatMap((u) => u.criteria).filter((c) => c.id === id)
+    // The feed has no gmlLineString: its polylines come from OpenLR lines only.
+    for (const c of crit('linearReferencing')) expect(c.distribution!.map((d) => d.label).sort()).toEqual(['OpenLR line', 'no polyline'])
     if (file.endsWith('2026-11-10T10_38_46.xml')) {
       expect(r.events).toHaveLength(147)
       expect(r.rtti!.openlr).toMatchObject({ recordsWithOpenlr: 53, structured: 53, binary: 0, lines: 37, points: 16, lrps: 117, validLrps: 117 })
-      // Seven references have a distance to the next point above the OpenLR maximum of 15 km.
+      // Seven references (5 lines, 2 points) have a distance to the next point above the OpenLR maximum of 15 km.
       expect(count(r, 'OLR-006')).toBe(7)
+      const dist = (id: string) => Object.fromEntries(crit(id)[0]!.distribution!.map((d) => [d.label, d.count]))
+      expect(dist('linearReferencing')).toEqual({ 'OpenLR line': 32, 'no polyline': 115 })
+      // directionRelativeOnLinearSection = both on 4 of them, while OpenLR has firstDirection only.
+      expect(dist('direction')).toEqual({ 'no polyline': 115, unambiguous: 28, ambiguous: 4 })
+      expect(count(r, 'RTTI-DIR-03')).toBe(4)
     }
   })
 

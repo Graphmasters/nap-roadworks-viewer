@@ -10,6 +10,7 @@ import { oneSideFullyClosed, summariseLaneCode } from '../lanes/codes'
 import { angleDiff, bearingDeg, distanceM, distanceToLineM } from '../location/geometry'
 import { usableOpenlr } from '../location/openlr'
 import { linesOf } from '../matching/score'
+import { OPENLR_MAX_DNP_M } from '../validation/rules'
 import type {
   AnalysisResult,
   Finding,
@@ -60,6 +61,8 @@ type DirectionStatus = 'unambiguous' | 'ambiguous' | 'contradiction' | 'no-polyl
 interface Facts {
   e: RoadEvent
   line?: LonLat[]
+  /** Where the polyline comes from: a gmlLineString, or the LRPs of a structured OpenLR line. */
+  lineSource?: 'gml' | 'openlr'
   /** A gmlLineString exists but not in WGS 84 degrees (e.g. a projected CRS): a polyline the viewer cannot read. */
   projected: boolean
   locLevel: number
@@ -110,6 +113,31 @@ function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[] } {
   return { line: best, defects }
 }
 
+/**
+ * A structured OpenLR line counts as a polyline (its LRPs in order), provided every LRP is a valid
+ * WGS 84 position and no two consecutive LRPs are farther apart than the OpenLR maximum (15 km).
+ */
+function openlrPolyline(e: RoadEvent, badOpenlr: boolean): { line?: LonLat[]; excluded?: string } {
+  const refs = e.openlr.filter((r) => r.encoding === 'structured' && r.kind === 'line')
+  if (!refs.length) return {}
+  if (badOpenlr) return { excluded: 'its OpenLR coordinates are invalid or swapped' }
+  const ordered = [...refs].sort((a, b) => Number(b.role === 'firstDirection') - Number(a.role === 'firstDirection'))
+  let excluded: string | undefined
+  for (const r of ordered) {
+    if (r.lrps.length < 2 || !usableOpenlr(r)) {
+      excluded ??= 'its OpenLR line has fewer than two valid WGS 84 points'
+      continue
+    }
+    const far = r.lrps.find((p) => p.dnp !== undefined && p.dnp > OPENLR_MAX_DNP_M)
+    if (far) {
+      excluded ??= `its OpenLR line has points ${far.dnp} m apart, more than the OpenLR maximum of ${OPENLR_MAX_DNP_M} m`
+      continue
+    }
+    return { line: r.lrps.map((p) => [p.lon!, p.lat!] as LonLat) }
+  }
+  return { excluded }
+}
+
 interface DirectionResult {
   status: DirectionStatus
   how: string
@@ -136,7 +164,7 @@ function directionOf(e: RoadEvent, line: LonLat[] | undefined, badOpenlr: boolea
 
   // (b) OpenLR: the polyline ends must lie within the offsets of the first / last LRP.
   const lineRefs = badOpenlr ? [] : e.openlr.filter((r) => r.kind === 'line' && usableOpenlr(r) && r.lrps.length >= 2)
-  const roles = new Set<string>()
+  const oriented: Array<{ role: string; value: 'forward' | 'backward' }> = []
   for (const r of lineRefs) {
     const f0 = r.lrps[0] as { lat: number; lon: number }
     const fl = r.lrps[r.lrps.length - 1] as { lat: number; lon: number }
@@ -154,13 +182,17 @@ function directionOf(e: RoadEvent, line: LonLat[] | undefined, badOpenlr: boolea
       fwd = d <= 90
       bwd = !fwd
     }
-    if (fwd || bwd) {
-      roles.add(r.role ?? 'firstDirection')
-      says.push({ value: fwd ? 'forward' : 'backward', source: `OpenLR ${r.role ?? 'line'} (polyline ${fwd ? 'in' : 'against'} LRP order)` })
-    } else
+    if (fwd || bwd) oriented.push({ role: r.role ?? 'firstDirection', value: fwd ? 'forward' : 'backward' })
+    else
       contradiction = `OpenLR ${r.role ?? 'line'}: polyline start is ${Math.round(Math.min(dsf, dsl))} m and end ${Math.round(Math.min(dtl, dtf))} m from the nearest end LRP, more than the offsets (${po} m / ${no} m) + ${tol} m allow`
   }
-  if (roles.has('firstDirection') && roles.has('oppositeDirection')) says.push({ value: 'both', source: 'OpenLR firstDirection and oppositeDirection' })
+  const first = oriented.find((o) => o.role === 'firstDirection')
+  const opposite = oriented.find((o) => o.role === 'oppositeDirection')
+  if (first && opposite && first.value !== opposite.value)
+    // Both direction sections, running opposite ways along the polyline: both directions affected.
+    says.push({ value: 'both', source: 'OpenLR firstDirection and oppositeDirection' })
+  else
+    for (const o of oriented) says.push({ value: o.value, source: `OpenLR ${o.role} (polyline ${o.value === 'forward' ? 'in' : 'against'} LRP order)` })
 
   // (c) aligned / opposite only count when the linear element is the same geometry.
   if (e.directionRelative === 'aligned' || e.directionRelative === 'opposite') {
@@ -303,12 +335,15 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
     // Per-record facts
     const facts: Facts[] = recs.map((e) => {
       const poly = polylineOf(e)
-      const projected = !poly.line && e.locationMethods.includes('gmlLineString') && e.warnings.some((w) => w.includes('outside the WGS 84 range'))
       const bad = badOpenlr.has(e.id)
+      const olr = poly.line ? {} : openlrPolyline(e, bad)
+      const line = poly.line ?? olr.line
+      const lineSource = poly.line ? 'gml' : olr.line ? 'openlr' : undefined
+      const projected = !line && e.locationMethods.includes('gmlLineString') && e.warnings.some((w) => w.includes('outside the WGS 84 range'))
       const loc = locationLevel(e, uc, bad)
       const dir: DirectionResult = projected
         ? { status: 'not-checked', how: 'the polyline is not in WGS 84 degrees, so its direction cannot be checked here' }
-        : directionOf(e, poly.line, bad)
+        : directionOf(e, line, bad)
       if (projected)
         add('RTTI-LIN-03', 'info', 'The polyline is not in WGS 84 degrees; direction and accuracy are not checked.', e, {
           explanation:
@@ -316,9 +351,11 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         })
       if (poly.line && poly.defects.length)
         add('RTTI-LIN-02', 'warning', `Polyline defects: ${poly.defects.join(', ')}.`, e)
-      if (!poly.line && !projected)
+      if (!line && !projected)
         add('RTTI-LIN-01', 'warning', 'No polyline: linear referencing (polylines) is required at every star level.', e, {
-          explanation: `Location methods: ${e.locationMethods.join(', ') || 'none'}. OpenLR or ALERT-C alone do not count as a polyline.`,
+          explanation: `Location methods: ${e.locationMethods.join(', ') || 'none'}. ${
+            olr.excluded ? `The OpenLR line does not count because ${olr.excluded}.` : 'A gmlLineString or a structured OpenLR line counts; ALERT-C, points and binary OpenLR do not.'
+          }`,
         })
       if (loc.level === 0)
         add('RTTI-LOC-01', 'warning', 'No location reference that counts for the rating (OpenLR, ALERT-C or coordinates).', e, {
@@ -329,6 +366,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         else add('RTTI-DIR-01', 'info', 'The direction of traffic along the polyline is ambiguous.', e, { explanation: dir.how })
       }
       if (dir.status === 'contradiction') add('RTTI-DIR-02', 'warning', 'OpenLR and the polyline contradict each other.', e, { explanation: dir.contradiction })
+      // Only against a real polyline: straight lines between OpenLR points cut corners.
       if (poly.line)
         for (const [plat, plon] of e.referencePoints) {
           const d = distanceToLineM(plat, plon, poly.line)
@@ -340,7 +378,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           }
         }
       const resolutionM = e.coordinateDecimals !== undefined ? 0.5 * 10 ** -e.coordinateDecimals * M_PER_DEG : undefined
-      return { e, line: poly.line, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
+      return { e, line, lineSource, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
     })
 
     const criteria: RttiCriterionResult[] = []
@@ -462,15 +500,18 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
     {
       const missing = facts.filter((f) => !f.line && !f.projected)
       const projected = facts.filter((f) => f.projected).length
+      const fromOpenlr = facts.filter((f) => f.lineSource === 'openlr').length
       crit('linearReferencing', {
         kind: 'ceiling',
         ceiling: missing.length ? 0 : 5,
-        evidence: `${facts.length - missing.length} of ${facts.length} records have a polyline (gmlLineString)${projected ? `, ${projected} of them not in WGS 84 degrees` : ''}.`,
+        evidence: `${facts.length - missing.length} of ${facts.length} records have a polyline${fromOpenlr ? ` (${fromOpenlr} from an OpenLR line)` : ''}${projected ? `, ${projected} not in WGS 84 degrees` : ''}.`,
         distribution: [
-          { label: 'polyline', count: facts.length - missing.length - projected },
-          { label: 'polyline, not WGS 84', count: projected },
+          { label: 'gmlLineString', count: facts.filter((f) => f.lineSource === 'gml').length },
+          { label: 'OpenLR line', count: fromOpenlr },
+          { label: 'gmlLineString, not WGS 84', count: projected },
           { label: 'no polyline', count: missing.length },
         ].filter((d) => d.count),
+        notes: ['A structured OpenLR line counts as a polyline when its points are valid WGS 84 positions at most 15 km apart (the OpenLR maximum).'],
         ...capIds(missing.map((f) => f.e.id)),
         ruleIds: ['RTTI-LIN-01', 'RTTI-LIN-02', 'RTTI-LIN-03'],
       })
@@ -495,7 +536,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         ...capIds(limiting.map((f) => f.e.id)),
         ruleIds: ['RTTI-DIR-01', 'RTTI-DIR-02', 'RTTI-DIR-03', 'RTTI-LIN-01'],
         notes: [
-          'Evaluated only on records with a polyline: a direction without a polyline cannot be tied to the geometry.',
+          'Evaluated only on records with a polyline (gmlLineString or OpenLR line): a direction without a polyline cannot be tied to the geometry. For an OpenLR line, its direction section gives the direction.',
           'Counts: both directions affected; OpenLR whose end LRPs match the polyline ends within the offsets; aligned/opposite on a linear element given by coordinates; a compass direction matching the polyline bearing.',
           'FRC is unknown, so direction is required for every record (the spec requires it for FRC3–6).',
         ],
