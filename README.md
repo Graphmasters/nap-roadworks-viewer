@@ -95,6 +95,22 @@ about the record. Record links in the RTTI panel open this tab.
 To run the checks against your own downloads, point the opt-in test at them:
 `DATEX_SAMPLES_DIR="/path/to/feeds" npx vitest run test/samples.test.ts`.
 
+### Sample feeds and their National Access Points
+
+The RTTI and OpenLR checks were tried on downloads from these National Access Points (NAPs). The
+repository contains no feed data. The folder names are those `test/samples.test.ts` expects under
+`DATEX_SAMPLES_DIR`.
+
+| Folder | Country | Publisher | DATEX II | NAP portal | Data |
+|---|---|---|---|---|---|
+| `bw` | Germany | Straßenbauverwaltung Baden-Württemberg (MDM roadworks profile) | v2 | [Mobilithek](https://mobilithek.info) | – |
+| `sh` | Germany | Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein (LBV.SH) | v2 | [Mobilithek](https://mobilithek.info) | [Offer 110000000003237002](https://mobilithek.info/offers/110000000003237002) |
+| `ndw` | Netherlands | NDW: temporary traffic measures and closures; roadworks and events planning feed | v3 | [NTM – Nationaal toegangspunt mobiliteitsdata](https://www.toegangspuntmobiliteit.nl) | [NDW open data](https://opendata.ndw.nu) |
+| `no` | Norway | Statens vegvesen (NPRA): road traffic information | v3 | [transportportal.no](https://transportportal.no) | [Road traffic information](https://dataut.vegvesen.no/en/dataset/trafikkmeldinger) (user account required) |
+| `dk-copenhagen` | Denmark | Københavns Kommune (identifier `0101`) | v3 | [Dataudveksleren](https://nap.vd.dk) (Vejdirektoratet) | – |
+| `si` | Slovenia | DARS / NCUP: roadworks, traffic events, safety-related traffic information | v3 | [NAP Slovenia](https://www.nap.si) (NCUP) | [Data sets](https://www.nap.si/en/datasets) |
+| `hr` | Croatia | Hrvatski autoklub (HAK), Hrvatske ceste (HC), Autocesta Zagreb–Macelj (AZM) | v2 | [NPT – Croatian National Access Point](https://www.promet-info.hr) (Hrvatske ceste) | – |
+
 ## Limitations
 
 - **Location referencing.** Only `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in
