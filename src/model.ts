@@ -380,10 +380,27 @@ export interface RttiUseCaseResult {
   criteria: RttiCriterionResult[]
 }
 
+/** Why one record holds down a criterion (shown in the inspector's QA tab). */
+export interface RttiRecordNote {
+  criterion: string
+  name: string
+  weight?: RttiWeight
+  /** The level this record alone allows (0–5), when the criterion has a per-record level. */
+  level?: number
+  text: string
+  ruleIds?: string[]
+}
+
 export interface RttiAssessment {
   specVersion: string
   specUrl: string
   useCases: RttiUseCaseResult[]
+  /** Use case of every rated record. */
+  recordUseCase: Record<string, RttiUseCase>
+  /** Per record: the criteria it holds down and why. Records without notes hold nothing down. */
+  recordNotes: Record<string, RttiRecordNote[]>
+  /** Per record that is not rated: the reason. */
+  notRated: Record<string, string>
   /** Records not rated, grouped by reason. */
   outOfScope: Array<{ reason: string; recordIds: string[] }>
   /** Feed-wide notes (e.g. static speed limits not applicable). */

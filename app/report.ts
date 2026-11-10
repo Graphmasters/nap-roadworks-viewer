@@ -14,7 +14,7 @@ export interface ReportCallbacks {
 
 export type XsdState = { status: 'none' } | { status: 'running' } | { status: 'done'; outcome: XsdOutcome } | { status: 'error'; message: string }
 
-const LAYER_LABEL: Record<FindingLayer, string> = {
+export const LAYER_LABEL: Record<FindingLayer, string> = {
   xml: 'XML',
   datex: 'DATEX II',
   xsd: 'XSD',
@@ -27,7 +27,7 @@ const LAYER_LABEL: Record<FindingLayer, string> = {
   rtti: 'RTTI 5-Star',
 }
 
-const RULE_TITLE: Record<string, string> = {
+export const RULE_TITLE: Record<string, string> = {
   'XML-001': 'Not well-formed',
   'XML-002': 'DOCTYPE present',
   'DTX-001': 'No DATEX II namespace',

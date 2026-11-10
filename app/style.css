@@ -826,3 +826,25 @@ table.lrp td {
 table.lrp tr.invalid td {
   color: var(--error);
 }
+
+/* ---------------------------------------------------------------- QA tab */
+.qa-crit {
+  margin: 4px 0 8px;
+}
+.qa-row {
+  display: grid;
+  grid-template-columns: 5.6em 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+  border-left: 3px solid var(--border);
+  padding: 3px 0 3px 8px;
+  margin: 3px 0;
+}
+.qa-row .crit-evidence,
+.qa-row ul.compact {
+  color: var(--fg);
+  font-size: 13px;
+}
+.small {
+  font-size: 12px;
+}

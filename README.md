@@ -88,6 +88,10 @@ Assumptions:
 - **Polylines in other coordinate systems.** A `gmlLineString` in another CRS (e.g. `srsName="25833"`)
   counts as a polyline, but its direction and accuracy are not checked (`RTTI-LIN-03`).
 
+**Per record:** the inspector's **QA** tab shows which criteria the selected record holds down and
+why, including the rule and message behind each internal contradiction, followed by every finding
+about the record. Record links in the RTTI panel open this tab.
+
 To run the checks against your own downloads, point the opt-in test at them:
 `DATEX_SAMPLES_DIR="/path/to/feeds" npx vitest run test/samples.test.ts`.
 

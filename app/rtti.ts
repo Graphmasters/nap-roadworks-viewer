@@ -11,7 +11,7 @@ export interface RttiCallbacks {
 
 const RECORD_BUTTONS = 12
 
-function stars(level: number): HTMLElement {
+export function stars(level: number): HTMLElement {
   const el = h('span', { class: `stars s${level}`, role: 'img', 'aria-label': level === 0 ? 'below 1 star' : `at most ${level} of 5 stars` })
   el.textContent = '★'.repeat(level) + '☆'.repeat(5 - level)
   return el

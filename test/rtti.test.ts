@@ -169,6 +169,30 @@ describe('RTTI 5-Star indicators', () => {
     expect(ceiling(noEnd, 'plannedRoadworks', 'validity')).toBe(0)
   })
 
+  it('explains per record which criteria it holds down and why', async () => {
+    const mdm = await run(V2_MDM)
+    const notes = (id: string) => mdm.rtti!.recordNotes[id] ?? []
+    // S-2-C is a closure whose cause is only a no-stopping restriction (DQ-RW-001).
+    const s2 = notes('S-2-C').filter((n) => n.criterion === 'correctness')
+    expect(s2.some((n) => n.text.startsWith('Internal contradiction (DQ-RW-001)'))).toBe(true)
+    expect(notes('S-2-C').find((n) => n.criterion === 'terminology')!.ruleIds).toEqual(['DQ-RW-001'])
+    expect(notes('S-3-W').find((n) => n.criterion === 'direction')).toMatchObject({ level: 2, weight: 'critical' })
+    expect(notes('S-3-W').find((n) => n.criterion === 'accuracy')!.text).toContain('3 significant decimal')
+    expect(mdm.rtti!.recordUseCase['S-3-W']).toBe('plannedRoadworks')
+
+    const rich = await run(V3_RICH)
+    expect(rich.rtti!.recordNotes).toEqual({})
+
+    const zero = await run(v2Doc(v2Situation('Z-2', v2Record('Z-2-W', line('53.728949 10.260071 53.728949 10.260071')))))
+    expect(zero.rtti!.recordNotes['Z-2-W']!.find((n) => n.criterion === 'linearReferencing')).toMatchObject({ level: 0, text: expect.stringContaining('zero length') })
+  })
+
+  it('records why a record is not rated', async () => {
+    const r = await run(v2Doc(v2Situation('N-1', v2Record('N-1-W', line(LINE_A), '', { type: 'AbnormalTraffic' }))))
+    expect(r.rtti!.recordUseCase['N-1-W']).toBeUndefined()
+    expect(r.rtti!.notRated['N-1-W']).toContain('not roadworks or a closure')
+  })
+
   it('survives structured cloning (worker boundary)', async () => {
     const r = await run(V3_DIRECTIONS)
     expect(JSON.parse(JSON.stringify(r.rtti))).toEqual(r.rtti)

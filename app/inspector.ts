@@ -3,12 +3,33 @@
 
 import { interpretLanes, renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
-import { compareLanes, describeOpenlr, laneCategoriesOf, linesOf, osmLaneAttributes, recordWayOrientation, validWgs84, WEIGHTS, type AnalysisResult, type OpenlrReference, type RefinedMatchResult, type RoadEvent } from '../src/index'
+import {
+  compareLanes,
+  describeOpenlr,
+  FINDINGS_PER_RULE,
+  laneCategoriesOf,
+  linesOf,
+  osmLaneAttributes,
+  recordWayOrientation,
+  RTTI_SPEC_URL,
+  USE_CASES,
+  validWgs84,
+  WEIGHTS,
+  type AnalysisResult,
+  type Finding,
+  type FindingLayer,
+  type OpenlrReference,
+  type RefinedMatchResult,
+  type RoadEvent,
+  type RttiRecordNote,
+} from '../src/index'
 import { append, badge, clear, dl, formatTime, h, link, spinner, type Child } from './dom'
+import { LAYER_LABEL, RULE_TITLE } from './report'
+import { stars } from './rtti'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
 
-export type Tab = 'record' | 'xml' | 'lanes' | 'situation' | 'osm' | 'match'
+export type Tab = 'record' | 'qa' | 'xml' | 'lanes' | 'situation' | 'osm' | 'match'
 
 export type Loadable<T> = { status: 'idle' } | { status: 'loading'; note?: string } | { status: 'done'; value: T } | { status: 'error'; message: string }
 
@@ -76,6 +97,7 @@ export interface InspectorCallbacks {
 
 const TABS: Array<[Tab, string]> = [
   ['record', 'Record'],
+  ['qa', 'QA'],
   ['xml', 'XML'],
   ['lanes', 'Lanes'],
   ['situation', 'Situation'],
@@ -105,6 +127,7 @@ export function renderInspector(el: HTMLElement, s: InspectorState, cb: Inspecto
     return
   }
   if (s.tab === 'record') renderRecord(body, s.result, e)
+  else if (s.tab === 'qa') renderQa(body, s.result, e)
   else if (s.tab === 'xml') renderXml(body, s, cb)
   else if (s.tab === 'lanes') renderLanes(body, s, e)
   else if (s.tab === 'situation') renderSituation(body, s.result, e, cb)
@@ -157,6 +180,95 @@ function renderRecord(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
   }
   if (p) append(el, h('h3', null, 'Passability'), h('ul', { class: 'compact' }, ...p.reasons.map((x) => h('li', null, x))), h('p', { class: 'muted' }, `Routing action: ${p.routingAction.replace(/_/g, ' ')}. An analysis hypothesis, not a legal statement.`))
   if (e.warnings.length) append(el, h('h3', null, 'Warnings'), h('ul', { class: 'compact' }, ...e.warnings.map((w) => h('li', null, w))))
+}
+
+const SEVERITY_ORDER: Finding['severity'][] = ['error', 'warning', 'info']
+
+/** QA tab: why this record holds down RTTI criteria, and every finding about it. */
+function renderQa(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
+  append(el, h('h2', null, e.description ?? e.recordType ?? e.id), h('p', { class: 'muted' }, h('code', null, e.id)))
+
+  // RTTI 5-Star: the criteria this record holds down, in the order of the use-case table.
+  const a = r.rtti
+  if (a) {
+    append(el, h('h3', null, 'RTTI 5-Star'))
+    const uc = a.recordUseCase[e.id]
+    if (!uc) append(el, h('p', { class: 'muted' }, `Not rated${a.notRated[e.id] ? `: ${a.notRated[e.id]}` : ''}.`))
+    else {
+      const order = a.useCases.find((u) => u.useCase === uc)?.criteria.map((c) => c.id) ?? []
+      const byCriterion = new Map<string, RttiRecordNote[]>()
+      for (const n of a.recordNotes[e.id] ?? []) {
+        let list = byCriterion.get(n.criterion)
+        if (!list) byCriterion.set(n.criterion, (list = []))
+        if (!list.some((x) => x.text === n.text)) list.push(n)
+      }
+      append(
+        el,
+        h('p', { class: 'muted' }, `${USE_CASES[uc].label} (${USE_CASES[uc].table}). Levels are what this record alone allows under the `, link(RTTI_SPEC_URL, 'TISA RTTI 5-Star Rating Specification'), '.'),
+      )
+      if (!byCriterion.size) append(el, h('p', null, badge('nothing to report', 'ok'), ' This record does not hold down any criterion that a file can show.'))
+      const list = h('div', { class: 'qa-crit' })
+      for (const [, notes] of [...byCriterion.entries()].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]))) {
+        const levels = notes.map((n) => n.level).filter((l): l is number => l !== undefined)
+        const first = notes[0]!
+        const rules = [...new Set(notes.flatMap((n) => n.ruleIds ?? []))].filter((x) => (r.findingCounts[x] ?? 0) > 0)
+        list.append(
+          h(
+            'div',
+            { class: 'qa-row' },
+            h(
+              'span',
+              { class: 'crit-level', title: levels.length ? '' : 'No per-record level: this record lowers the feed-wide share for this criterion.' },
+              levels.length ? stars(Math.min(...levels)) : badge('share', 'muted'),
+            ),
+            h(
+              'div',
+              null,
+              h('div', { class: 'crit-name' }, first.name, first.weight ? [' ', h('span', { class: `weight w-${first.weight}` }, first.weight)] : null),
+              notes.length > 1 ? h('ul', { class: 'compact' }, ...notes.map((n) => h('li', null, n.text))) : h('div', { class: 'crit-evidence' }, first.text),
+              rules.length ? h('div', { class: 'muted small' }, `Findings: ${rules.join(', ')}`) : null,
+            ),
+          ),
+        )
+      }
+      if (byCriterion.size) el.append(list)
+    }
+  }
+
+  // Every finding naming this record, or its situation without naming records.
+  const own = r.findings.filter((f) => f.recordIds?.includes(e.id) || (!f.recordIds?.length && f.situationId === e.situationId))
+  append(el, h('h3', null, `Findings (${own.length})`))
+  if (!own.length) append(el, h('p', { class: 'muted' }, 'No finding names this record.'))
+  const byLayer = new Map<FindingLayer, Finding[]>()
+  for (const f of own) {
+    let list = byLayer.get(f.layer)
+    if (!list) byLayer.set(f.layer, (list = []))
+    list.push(f)
+  }
+  for (const [layer, fs] of byLayer) {
+    fs.sort((x, y) => SEVERITY_ORDER.indexOf(x.severity) - SEVERITY_ORDER.indexOf(y.severity) || x.ruleId.localeCompare(y.ruleId))
+    const list = h('div', { class: 'findings' })
+    for (const f of fs)
+      list.append(
+        h(
+          'details',
+          { class: `finding ${f.severity}`, open: fs.length <= 3 || f.severity === 'error' ? true : undefined },
+          h('summary', null, badge(f.severity, f.severity), ' ', h('code', null, f.ruleId), ' ', RULE_TITLE[f.ruleId] ?? ''),
+          h('p', null, f.message),
+          f.explanation ? h('p', { class: 'muted pre' }, f.explanation) : null,
+          dl([
+            ['Value', f.rawValue ? h('code', { class: 'wrap' }, f.rawValue) : undefined],
+            ['Records', f.recordIds && f.recordIds.length > 1 ? f.recordIds.join(', ') : undefined],
+            ['XML path', f.xmlPath && f.xmlPath !== e.xmlPath ? h('code', { class: 'wrap' }, f.xmlPath) : undefined],
+            ['Remedy', f.remedy],
+          ]),
+        ),
+      )
+    append(el, h('h4', null, LAYER_LABEL[layer]), list)
+  }
+  const capped = Object.entries(r.findingCounts).filter(([, n]) => n > FINDINGS_PER_RULE).map(([rule]) => rule)
+  if (capped.length)
+    append(el, h('p', { class: 'muted' }, `Findings are stored up to ${FINDINGS_PER_RULE.toLocaleString('en')} per rule. For ${capped.join(', ')} this list may miss some; the RTTI reasons above are complete.`))
 }
 
 function laneDetailText(e: RoadEvent): string {

@@ -18,6 +18,7 @@ import type {
   RoadEvent,
   RttiAssessment,
   RttiCriterionResult,
+  RttiRecordNote,
   RttiUseCase,
   RttiUseCaseResult,
   Severity,
@@ -65,6 +66,8 @@ interface Facts {
   lineSource?: 'gml' | 'openlr'
   /** A gmlLineString whose positions all coincide (zero length): a point written as a line. */
   zeroLength?: LonLat
+  /** Why the record has no polyline, when it has none. */
+  lineNote?: string
   /** A gmlLineString exists but not in WGS 84 degrees (e.g. a projected CRS): a polyline the viewer cannot read. */
   projected: boolean
   locLevel: number
@@ -329,6 +332,15 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
   }
 
   const useCases: RttiUseCaseResult[] = []
+  const recordNotes: Record<string, RttiRecordNote[]> = {}
+  const recordUseCase: Record<string, RttiUseCase> = {}
+  const label0: Record<DirectionStatus, string> = {
+    unambiguous: 'Unambiguous',
+    ambiguous: 'Ambiguous',
+    contradiction: 'Contradiction',
+    'no-polyline': 'No polyline',
+    'not-checked': 'Not checked',
+  }
   for (const uc of USE_CASE_ORDER) {
     const sits = classes.filter((c) => c.useCase === uc)
     if (!sits.length) continue
@@ -394,7 +406,14 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           }
         }
       const resolutionM = e.coordinateDecimals !== undefined ? 0.5 * 10 ** -e.coordinateDecimals * M_PER_DEG : undefined
-      return { e, line, lineSource, zeroLength: zero, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
+      const lineNote = line || projected
+        ? undefined
+        : zero
+          ? `The gmlLineString has zero length (all positions are ${zero[1]} ${zero[0]}).`
+          : olr.excluded
+            ? `No gmlLineString, and the OpenLR line does not count because ${olr.excluded}.`
+            : `No gmlLineString or OpenLR line (location methods: ${e.locationMethods.join(', ') || 'none'}).`
+      return { e, line, lineSource, zeroLength: zero, lineNote, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
     })
 
     const criteria: RttiCriterionResult[] = []
@@ -403,6 +422,14 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
       if (!weights[id]) return
       criteria.push({ id, name: CRITERION_NAME[id], weight: weights[id]!, levels: levelTexts(uc, id), ...r })
     }
+    /** Records why `recordId` holds down criterion `id` (only for criteria of this use case). */
+    const note = (recordId: string, id: CriterionId, level: number | undefined, text: string, ruleIds?: string[]) => {
+      if (!weights[id]) return
+      let list = recordNotes[recordId]
+      if (!list) recordNotes[recordId] = list = []
+      list.push({ criterion: id, name: CRITERION_NAME[id], weight: weights[id], level, text, ruleIds })
+    }
+    for (const e of recs) recordUseCase[e.id] = uc
 
     // Terminology & definition
     {
@@ -417,12 +444,16 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
             e.laneCodes.some((c) => oneSideFullyClosed(summariseLaneCode(c.value)))
           if (allLanes) {
             conflicts.add(e.id)
+            note(e.id, 'terminology', 2, 'Every lane in a direction is restricted, but the situation is not published as a road closure.', ['RTTI-TERM-01'])
             add('RTTI-TERM-01', 'warning', 'Every lane in a direction is restricted, but the situation is not published as a road closure.', e, {
               explanation:
                 'Under the TISA definitions (§3.5, §3.6) roadworks keep at least one lane open in the driving direction; once all lanes in a direction are blocked the event is a road closure with the roadworks as cause.',
             })
           }
         }
+      for (const f of baseFindings)
+        if ((f.ruleId === 'DQ-RW-001' || f.ruleId === 'DQ-RW-002') && f.recordIds)
+          for (const id of f.recordIds) if (conflicts.has(id)) note(id, 'terminology', 2, `${f.ruleId}: ${f.message}`, [f.ruleId])
       crit('terminology', {
         kind: 'ceiling',
         ceiling: conflicts.size ? 2 : 5,
@@ -449,6 +480,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         if (e.laneDetail.laneUsageWithoutNumber) issues.push('laneUsage without laneNumber (RRP-RTTI: use them jointly)')
         if (issues.length) {
           specIssues.add(e.id)
+          note(e.id, 'useOfSpecification', 2, `Deviates from the DATEX II RTTI reference profile: ${issues.join('; ')}.`, ['RTTI-SPEC-01'])
           add('RTTI-SPEC-01', 'info', `Deviates from the DATEX II RTTI reference profile: ${issues[0]}${issues.length > 1 ? ` (+${issues.length - 1} more)` : ''}.`, e, {
             explanation: `${issues.join('; ')}. Reference profile: https://docs.datex2.eu/recommended-profiles/rrp/rtti/`,
           })
@@ -499,6 +531,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
     {
       const levels = facts.map((f) => f.locLevel)
       const min = Math.min(...levels)
+      for (const f of facts) if (f.locLevel < 5) note(f.e.id, 'locationReferencing', f.locLevel, `Best location reference: ${f.locMethod}.`, ['RTTI-LOC-01'])
       crit('locationReferencing', {
         kind: 'ceiling',
         ceiling: min,
@@ -515,6 +548,16 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
     // Linear referencing and its sub-criterion, direction
     {
       const missing = facts.filter((f) => !f.line && !f.projected)
+      for (const f of missing) note(f.e.id, 'linearReferencing', 0, f.lineNote ?? 'No polyline.', ['RTTI-LIN-01'])
+      for (const f of facts)
+        if (f.dir !== 'unambiguous')
+          note(
+            f.e.id,
+            'direction',
+            f.dir === 'not-checked' ? undefined : 2,
+            f.dir === 'no-polyline' ? 'Not referenced: without a polyline the direction cannot be tied to the geometry.' : `${label0[f.dir]}: ${f.dirHow}.`,
+            f.dir === 'contradiction' ? ['RTTI-DIR-02'] : f.dir === 'ambiguous' ? ['RTTI-DIR-01', 'RTTI-DIR-03'] : undefined,
+          )
       const projected = facts.filter((f) => f.projected).length
       const fromOpenlr = facts.filter((f) => f.lineSource === 'openlr').length
       crit('linearReferencing', {
@@ -596,6 +639,8 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
       const min = levels.length ? Math.min(...levels) : 5
       withRes.forEach((f, i) => {
         if (levels[i]! < 5)
+          note(f.e.id, 'accuracy', levels[i], `Coordinates have ${f.e.coordinateDecimals} significant decimal(s): resolution ≈ ${f.resolutionM! < 1 ? f.resolutionM!.toFixed(2) : Math.round(f.resolutionM!)} m.`, ['RTTI-ACC-01'])
+        if (levels[i]! < 5)
           add('RTTI-ACC-01', 'info', `Coordinates have ${f.e.coordinateDecimals} decimal(s): resolution ≈ ${f.resolutionM! < 1 ? f.resolutionM!.toFixed(2) : Math.round(f.resolutionM!)} m.`, f.e, {
             explanation: `Coordinate resolution alone limits this record's accuracy to ${star(levels[i]!)} for ${USE_CASES[uc].label.toLowerCase()}.`,
           })
@@ -620,6 +665,10 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
       const bad = new Set<string>()
       for (const id of flagged('SEM-002', 'LANE-003', 'DQ-RW-001', 'DQ-RW-002')) if (recIds.has(id)) bad.add(id)
       for (const f of findings) if ((f.ruleId === 'RTTI-TERM-01' || f.ruleId === 'RTTI-DIR-02') && f.recordIds?.[0] && recIds.has(f.recordIds[0])) bad.add(f.recordIds[0])
+      const contradictionRules = new Set(['SEM-002', 'LANE-003', 'DQ-RW-001', 'DQ-RW-002', 'RTTI-TERM-01', 'RTTI-DIR-02'])
+      for (const f of [...baseFindings, ...findings])
+        if (contradictionRules.has(f.ruleId))
+          for (const id of f.recordIds ?? []) if (bad.has(id)) note(id, 'correctness', undefined, `Internal contradiction (${f.ruleId}): ${f.message}`, [f.ruleId])
       const pct = recs.length ? (100 * (recs.length - bad.size)) / recs.length : 100
       crit('correctness', {
         kind: 'ceiling',
@@ -661,7 +710,10 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           ])
         const present = attrs.filter(([, ok]) => ok).length
         sum += present / attrs.length
-        if (present < attrs.length) incomplete.push(e.id)
+        if (present < attrs.length) {
+          incomplete.push(e.id)
+          note(e.id, 'completeness', undefined, `${Math.round((100 * present) / attrs.length)} % of the attributes present; missing: ${attrs.filter(([, ok]) => !ok).map(([n]) => n).join(', ')}.`)
+        }
         for (const [name, ok] of attrs) if (!ok) missingCount.set(`missing ${name}`, (missingCount.get(`missing ${name}`) ?? 0) + 1)
       }
       const pct = facts.length ? (100 * sum) / facts.length : 100
@@ -682,6 +734,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         const missing = [e.id.startsWith('(') && 'id', !e.version && 'version', !e.versionTime && 'situationRecordVersionTime'].filter(Boolean)
         if (missing.length) {
           problems.add(e.id)
+          note(e.id, 'eventId', 2, `Record without ${missing.join(', ')}.`, ['RTTI-ID-01'])
           add('RTTI-ID-01', 'warning', `Record without ${missing.join(', ')}.`, e, {
             explanation: 'Stable event message IDs need an id, a version and a version time on every record so that updates can be tracked.',
           })
@@ -689,13 +742,18 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         const dup = duplicateOf.get(e.id)
         if (dup) {
           problems.add(e.id)
+          note(e.id, 'eventId', 2, `Probably the same event as record ${dup}, published under a different id.`, ['RTTI-ID-02'])
           add('RTTI-ID-02', 'warning', `Probably the same event as record ${dup}, published under a different id.`, e, {
             explanation: 'Same record type, polyline ends and validity in another situation.',
           })
         }
       }
       const recIds = new Set(recs.map((e) => e.id))
-      for (const id of flagged('SEM-001', 'SEM-005')) if (recIds.has(id)) problems.add(id)
+      for (const id of flagged('SEM-001', 'SEM-005'))
+        if (recIds.has(id)) {
+          problems.add(id)
+          note(id, 'eventId', 2, 'The record id is used more than once (SEM-001 / SEM-005).', ['SEM-001', 'SEM-005'])
+        }
       crit('eventId', {
         kind: 'ceiling',
         ceiling: problems.size ? 2 : 5,
@@ -719,8 +777,11 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           .sort((a, b) => b.ageH - a.ageH)
         const terminated = recs.filter((e) => e.operatorActionStatus === 'terminated' || e.operatorActionStatus === 'rejected')
         const maxH = ended[0]?.ageH ?? 0
-        const ceiling = maxH <= 24 ? 5 : maxH <= 168 ? 4 : maxH <= 336 ? 3 : maxH <= 504 ? 2 : maxH <= 672 ? 1 : 0
+        const levelFor = (h: number) => (h <= 24 ? 5 : h <= 168 ? 4 : h <= 336 ? 3 : h <= 504 ? 2 : h <= 672 ? 1 : 0)
+        const ceiling = levelFor(maxH)
         const fmt = (h: number) => (h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} days`)
+        for (const x of ended) if (levelFor(x.ageH) < 5) note(x.e.id, 'outdated', levelFor(x.ageH), `Ended ${fmt(x.ageH)} before publicationTime and still in the feed.`, ['SEM-003'])
+        for (const e of terminated) note(e.id, 'outdated', undefined, `operatorActionStatus is ${e.operatorActionStatus} but the record is still in the feed.`)
         crit('outdated', {
           kind: 'ceiling',
           ceiling,
@@ -769,8 +830,15 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
       const name = ['generic', 'lane level', 'which lane', 'which lane + width + speed limit']
       const dist = distribution(perSit.map((x) => name[x.level]!))
       const roadTypeMap = unplanned ? [2, 3, 5, 5] : [2, 4, 4, 5]
+      const llMapAll = [2, 2, 3, 5]
       const limitingIds = (lv: number, map: number[]) =>
         capIds(perSit.filter((x) => map[x.level] === lv && lv < 5).flatMap((x) => eventsBySituation.get(x.c.situationId)?.map((e) => e.id) ?? []))
+      for (const x of perSit)
+        for (const e of eventsBySituation.get(x.c.situationId) ?? []) {
+          const text = `Lane detail of the situation: ${name[x.level]}.`
+          if (roadTypeMap[x.level]! < 5) note(e.id, 'roadType', roadTypeMap[x.level], text)
+          if (llMapAll[x.level]! < 5) note(e.id, 'laneLevel', llMapAll[x.level], text)
+        }
       const rtMin = Math.min(...perSit.map((x) => roadTypeMap[x.level]!))
       crit('roadType', {
         kind: 'ceiling',
@@ -779,7 +847,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         distribution: dist,
         ...limitingIds(rtMin, roadTypeMap),
       })
-      const llMap = [2, 2, 3, 5]
+      const llMap = llMapAll
       const llMin = Math.min(...perSit.map((x) => llMap[x.level]!))
       crit('laneLevel', {
         kind: 'ceiling',
@@ -800,6 +868,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         const openEndOk = unplanned && !!e.validityStatus
         if (!e.validFrom || (!e.validTo && !openEndOk)) {
           missing.push(e)
+          note(e.id, 'validity', 0, `Missing ${[!e.validFrom && 'overallStartTime', !e.validTo && 'overallEndTime'].filter(Boolean).join(' and ')}.`, ['RTTI-VAL-01'])
           add('RTTI-VAL-01', 'warning', `Missing ${[!e.validFrom && 'overallStartTime', !e.validTo && 'overallEndTime'].filter(Boolean).join(' and ')}.`, e, {
             explanation: 'Validity periods (start and end) are required for all roadworks and closures; unplanned events may use an open end.',
           })
@@ -838,6 +907,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         for (const e of list.filter((x) => x.type === 'fullClosure'))
           if (!e.causeType && !e.causeRecordIds.length && !hasWorks) {
             missing.push(e)
+            note(e.id, 'causeType', 2, 'Closure without causeType, cause link or works record in its situation.', ['RTTI-CAUSE-01'])
             if (uc === 'unplannedClosure') add('RTTI-CAUSE-01', 'info', 'Closure without an explanation of its cause.', e)
           }
       }
@@ -877,11 +947,15 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
   }
 
   const outMap = new Map<string, string[]>()
+  const notRated: Record<string, string> = {}
   for (const c of classes)
     if (c.outOfScope) {
       let list = outMap.get(c.outOfScope)
       if (!list) outMap.set(c.outOfScope, (list = []))
-      list.push(...(eventsBySituation.get(c.situationId) ?? []).map((e) => e.id))
+      for (const e of eventsBySituation.get(c.situationId) ?? []) {
+        list.push(e.id)
+        notRated[e.id] = c.outOfScope
+      }
     }
 
   return {
@@ -889,6 +963,9 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
       specVersion: RTTI_SPEC_VERSION,
       specUrl: RTTI_SPEC_URL,
       useCases,
+      recordUseCase,
+      recordNotes,
+      notRated,
       outOfScope: [...outMap.entries()].map(([reason, recordIds]) => ({ reason, recordIds: recordIds.slice(0, MAX_IDS) })),
       notes: [
         'Each level is a ceiling derived from this file: the feed cannot score higher on that criterion. It is not a TISA rating; the TISA Evaluation Methodology is not published yet.',
