@@ -11,7 +11,7 @@ const V2_TAIL = `
   </payloadPublication>
 </d2LogicalModel>`
 
-function v2Works(id: string, lane: string, ext: string | undefined, posList: string, from = '2026-05-01T00:00:00+02:00', to = '2026-07-01T00:00:00+02:00') {
+export function v2Works(id: string, lane: string, ext: string | undefined, posList: string, from = '2026-05-01T00:00:00+02:00', to = '2026-07-01T00:00:00+02:00') {
   return `
       <situationRecord id="${id}" version="1" xsi:type="MaintenanceWorks">
         <situationRecordCreationTime>2026-04-01T00:00:00+02:00</situationRecordCreationTime>
@@ -31,7 +31,7 @@ function v2Works(id: string, lane: string, ext: string | undefined, posList: str
       </situationRecord>`
 }
 
-function v2Closure(id: string, cause: string, posList: string, from = '2026-05-01T00:00:00+02:00', to = '2026-07-01T00:00:00+02:00') {
+export function v2Closure(id: string, cause: string, posList: string, from = '2026-05-01T00:00:00+02:00', to = '2026-07-01T00:00:00+02:00') {
   return `
       <situationRecord id="${id}" version="1" xsi:type="RoadOrCarriagewayOrLaneManagement">
         <situationRecordCreationTime>2026-04-01T00:00:00+02:00</situationRecordCreationTime>
@@ -47,7 +47,7 @@ function v2Closure(id: string, cause: string, posList: string, from = '2026-05-0
       </situationRecord>`
 }
 
-const LINE_A = '53.500000 10.000000 53.501000 10.002000 53.502000 10.004000'
+export const LINE_A = '53.500000 10.000000 53.501000 10.002000 53.502000 10.004000'
 const LINE_B = '53.600000 10.100000 53.601000 10.101000'
 
 /** v2 MDM-style feed: a genuine closure (S-1), a DQ-RW-001 case (S-2) and a lane reduction (S-3). */
@@ -101,3 +101,239 @@ export const BROKEN = `<?xml version="1.0"?>
 </d2LogicalModel>`
 
 export const NOT_DATEX = `<?xml version="1.0"?><root><child/></root>`
+
+// ------------------------------------------------------------------------------------------------
+// RTTI 5-Star and OpenLR fixtures. Synthetic: they copy the element structure of real v2 (HR-style
+// `openlrExtendedLinear`) and v3 (SI-style native `openlrLinear`) feeds with invented values.
+
+/** A v2 document with the given situations (publicationTime 2026-06-01T10:00:00+02:00). */
+export function v2Doc(...situations: string[]): string {
+  return `${V2_HEAD}${situations.join('')}${V2_TAIL}`
+}
+
+export function v2Situation(id: string, ...records: string[]): string {
+  return `
+    <situation id="${id}" version="1">${records.join('')}
+    </situation>`
+}
+
+/** A v2 MaintenanceWorks record with free location and extra elements. */
+export function v2Record(id: string, location: string, extra = '', opts: { from?: string; to?: string; created?: string; type?: string } = {}): string {
+  const { from = '2026-06-10T00:00:00+02:00', to = '2026-06-20T00:00:00+02:00', created = '2026-05-01T00:00:00+02:00', type = 'MaintenanceWorks' } = opts
+  return `
+      <situationRecord id="${id}" version="1" xsi:type="${type}">
+        <situationRecordCreationTime>${created}</situationRecordCreationTime>
+        <situationRecordVersionTime>${created}</situationRecordVersionTime>
+        <validity><validityStatus>definedByValidityTimeSpec</validityStatus>
+          <validityTimeSpecification><overallStartTime>${from}</overallStartTime>${to ? `<overallEndTime>${to}</overallEndTime>` : ''}</validityTimeSpecification>
+        </validity>${extra}
+        <groupOfLocations xsi:type="Linear">${location}
+        </groupOfLocations>
+      </situationRecord>`
+}
+
+/** v2 OpenLR LRP (HR style: `openlrCoordinate`, `FRC0`, `openlrLowestFRCToNextLRPoint`). */
+function v2Lrp(lat: string | number, lon: string | number, dnp?: number, last = false): string {
+  const tag = last ? 'openlrLastLocationReferencePoint' : 'openlrLocationReferencePoint'
+  return `<${tag}><openlrCoordinate><latitude>${lat}</latitude><longitude>${lon}</longitude></openlrCoordinate>
+            <openlrLineAttributes><openlrFunctionalRoadClass>FRC0</openlrFunctionalRoadClass><openlrFormOfWay>motorway</openlrFormOfWay><openlrBearing>${last ? 270 : 90}</openlrBearing></openlrLineAttributes>${
+              dnp !== undefined ? `<openlrPathAttributes><openlrLowestFRCToNextLRPoint>FRC0</openlrLowestFRCToNextLRPoint><openlrDistanceToNextLRPoint>${dnp}</openlrDistanceToNextLRPoint></openlrPathAttributes>` : ''
+            }</${tag}>`
+}
+
+export function v2OpenlrLine(lrps: string, po = 72, no = 72): string {
+  return `
+          <linearExtension><openlrExtendedLinear><firstDirection>${lrps}
+            <openlrOffsets><openlrPositiveOffset>${po}</openlrPositiveOffset><openlrNegativeOffset>${no}</openlrNegativeOffset></openlrOffsets>
+          </firstDirection></openlrExtendedLinear></linearExtension>`
+}
+
+const V2_LINE_45 = '45.50001 16.00003 45.50011 16.00702 45.50002 16.01404'
+
+/** HR-style v2 feed: OpenLR without polyline, point OpenLR, binary OpenLR and invalid coordinates. */
+export const V2_OPENLR = v2Doc(
+  v2Situation(
+    'H-1',
+    v2Record(
+      'H-1-R',
+      `
+          <locationForDisplay><latitude>45.5</latitude><longitude>16.007</longitude></locationForDisplay>
+          <linearWithinLinearElement><directionRelativeOnLinearSection>opposite</directionRelativeOnLinearSection>
+            <linearElement xsi:type="LinearElementByCode"><linearElementIdentifier>A9</linearElementIdentifier></linearElement>
+          </linearWithinLinearElement>${v2OpenlrLine(v2Lrp(45.5, 15.999, 1150) + v2Lrp(45.5, 16.015, undefined, true))}`,
+    ),
+  ),
+  v2Situation(
+    'H-2',
+    v2Record(
+      'H-2-R',
+      `
+          <pointByCoordinates><pointCoordinates><latitude>45.60012</latitude><longitude>16.10034</longitude></pointCoordinates></pointByCoordinates>
+          <pointExtension><openlrExtendedPoint><openlrPointLocationReference><openlrPointAlongLine>
+            <openlrSideOfRoad>onRoadOrUnknown</openlrSideOfRoad><openlrOrientation>noOrientationOrUnknown</openlrOrientation><openlrPositiveOffset>300</openlrPositiveOffset>
+            ${v2Lrp(45.6, 16.096, 900)}${v2Lrp(45.6, 16.108, undefined, true)}
+          </openlrPointAlongLine></openlrPointLocationReference></openlrExtendedPoint></pointExtension>`,
+    ),
+  ),
+  v2Situation(
+    'H-BIN',
+    v2Record(
+      'H-BIN-R',
+      `
+          <linearExtension><linearExtended><gmlLineString><posList>${V2_LINE_45}</posList></gmlLineString></linearExtended></linearExtension>
+          <locationExtension><openlr><binary version="3">CwiVbSRvaQEI/EwVChwBdzkL</binary></openlr></locationExtension>`,
+    ),
+  ),
+  v2Situation('H-PROJ', v2Record('H-PROJ-R', v2OpenlrLine(v2Lrp(5432100, 612345, 1150) + v2Lrp(5432100, 613500, undefined, true)))),
+  v2Situation('H-NULL', v2Record('H-NULL-R', v2OpenlrLine(v2Lrp(0, 0, 1150) + v2Lrp(45.5, 16.015, undefined, true)))),
+  v2Situation('H-NAN', v2Record('H-NAN-R', v2OpenlrLine(v2Lrp('n/a', 16.0, 1150) + v2Lrp(45.5, 16.015, undefined, true)))),
+  v2Situation(
+    'H-SWAP',
+    v2Record(
+      'H-SWAP-R',
+      `
+          <linearExtension><linearExtended><gmlLineString><posList>${V2_LINE_45}</posList></gmlLineString></linearExtended></linearExtension>${v2OpenlrLine(v2Lrp(15.999, 45.5, 1150) + v2Lrp(16.015, 45.5, undefined, true))}`,
+      '',
+      { to: '2026-06-21T00:00:00+02:00' },
+    ),
+  ),
+  v2Situation('H-DNP', v2Record('H-DNP-R', v2OpenlrLine(v2Lrp(45.5, 15.999, 500) + v2Lrp(45.5, 16.03, undefined, true)))),
+  v2Situation('H-NOLAST', v2Record('H-NOLAST-R', v2OpenlrLine(v2Lrp(45.5, 15.999, 1150) + v2Lrp(45.5, 16.015, 300)))),
+)
+
+// v3 ---------------------------------------------------------------------------------------------
+
+const V3_HEAD = `<?xml version="1.0" encoding="UTF-8"?><d2:payload xmlns="http://datex2.eu/schema/3/common" xmlns:sit="http://datex2.eu/schema/3/situation" xmlns:loc="http://datex2.eu/schema/3/locationReferencing" xmlns:d2="http://datex2.eu/schema/3/d2Payload" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" modelBaseVersion="3" xsi:type="sit:SituationPublication" lang="en"><publicationTime>2026-06-01T08:00:00Z</publicationTime><publicationCreator><country>xx</country><nationalIdentifier>EXAMPLE</nationalIdentifier></publicationCreator>`
+const V3_TAIL = `</d2:payload>`
+
+export function v3Doc(...situations: string[]): string {
+  return `${V3_HEAD}${situations.join('')}${V3_TAIL}`
+}
+
+export function v3Situation(id: string, ...records: string[]): string {
+  return `<sit:situation id="${id}">${records.join('')}</sit:situation>`
+}
+
+export interface V3RecordOptions {
+  type?: string
+  from?: string
+  to?: string
+  created?: string
+  periods?: boolean
+  locType?: string
+  /** Elements between validity and the location (impact, cause, characteristics, …). */
+  before?: string
+  /** Elements after the location (management type, works type, …). */
+  after?: string
+}
+
+export function v3Record(id: string, location: string, o: V3RecordOptions = {}): string {
+  const { type = 'MaintenanceWorks', from = '2026-06-10T00:00:00Z', to = '2026-06-20T00:00:00Z', created = '2026-05-20T00:00:00Z', locType = 'SingleRoadLinearLocation' } = o
+  const periods = o.periods
+    ? `<validPeriod><recurringTimePeriodOfDay xsi:type="TimePeriodByHour"><startTimeOfPeriod>22:00:00</startTimeOfPeriod><endTimeOfPeriod>06:00:00</endTimeOfPeriod></recurringTimePeriodOfDay></validPeriod>`
+    : ''
+  return `<sit:situationRecord xsi:type="sit:${type}" id="${id}" version="1"><sit:situationRecordCreationTime>${created}</sit:situationRecordCreationTime><sit:situationRecordVersionTime>${created}</sit:situationRecordVersionTime><sit:probabilityOfOccurrence>certain</sit:probabilityOfOccurrence><sit:validity><validityStatus>definedByValidityTimeSpec</validityStatus><validityTimeSpecification><overallStartTime>${from}</overallStartTime>${to ? `<overallEndTime>${to}</overallEndTime>` : ''}${periods}</validityTimeSpecification></sit:validity>${o.before ?? ''}<sit:locationReference xsi:type="loc:${locType}">${location}</sit:locationReference>${o.after ?? ''}</sit:situationRecord>`
+}
+
+/** v3 OpenLR LRP (SI style: `openlrCoordinates`, `frc3`, `openlrLowestFrcToNextLRPoint`). */
+export function v3Lrp(lat: number, lon: number, dnp?: number, last = false): string {
+  const tag = last ? 'openlrLastLocationReferencePoint' : 'openlrLocationReferencePoint'
+  return `<loc:${tag}><loc:openlrCoordinates><loc:latitude>${lat}</loc:latitude><loc:longitude>${lon}</loc:longitude></loc:openlrCoordinates><loc:openlrLineAttributes><loc:openlrFunctionalRoadClass>frc3</loc:openlrFunctionalRoadClass><loc:openlrFormOfWay>singleCarriageway</loc:openlrFormOfWay><loc:openlrBearing>${last ? 270 : 90}</loc:openlrBearing></loc:openlrLineAttributes>${
+    dnp !== undefined ? `<loc:openlrPathAttributes><loc:openlrLowestFrcToNextLRPoint>frc3</loc:openlrLowestFrcToNextLRPoint><loc:openlrDistanceToNextLRPoint>${dnp}</loc:openlrDistanceToNextLRPoint></loc:openlrPathAttributes>` : ''
+  }</loc:${tag}>`
+}
+
+export function v3OpenlrLine(lrps: string, po = 72, no = 72, role = 'firstDirection'): string {
+  return `<loc:openlrLinear><loc:${role}>${lrps}<loc:openlrOffsets><loc:openlrPositiveOffset>${po}</loc:openlrPositiveOffset><loc:openlrNegativeOffset>${no}</loc:openlrNegativeOffset></loc:openlrOffsets></loc:${role}></loc:openlrLinear>`
+}
+
+/** Polyline from 50.0/8.0 eastwards (~1 km), 5 significant decimals. */
+export const LINE_E = '50.00001 8.00003 50.00011 8.00702 50.00002 8.01404'
+export const LINE_W = '50.00002 8.01404 50.00011 8.00702 50.00001 8.00003'
+/** OpenLR that covers LINE_E: first LRP ~72 m west of its start, last ~72 m east of its end. */
+export const OLR_E = v3OpenlrLine(v3Lrp(50, 7.999, 1150) + v3Lrp(50, 8.015, undefined, true))
+
+export const gml = (posList: string) => `<loc:gmlLineString srsName="EPSG:4326"><loc:posList>${posList}</loc:posList></loc:gmlLineString>`
+const lane = (n: number) =>
+  `<loc:supplementaryPositionalDescription><loc:carriageway><loc:carriageway>mainCarriageway</loc:carriageway><loc:lane><loc:laneNumber>${n}</loc:laneNumber></loc:lane></loc:carriageway></loc:supplementaryPositionalDescription>`
+const alertC = (inner: string) =>
+  `<loc:alertCLinear xsi:type="loc:AlertCMethod4Linear"><loc:alertCLocationCountryCode>D</loc:alertCLocationCountryCode><loc:alertCLocationTableNumber>1</loc:alertCLocationTableNumber><loc:alertCLocationTableVersion>1.0</loc:alertCLocationTableVersion><loc:alertCDirection>${inner}</loc:alertCDirection></loc:alertCLinear>`
+
+/**
+ * v3 feed meant to reach 5★ wherever a file can show it: a planned roadworks situation (works +
+ * lane speed limit, lane numbers, width, schedule, vehicle classes) and a planned closure caused by
+ * construction works.
+ */
+export const V3_RICH = v3Doc(
+  v3Situation(
+    'R-1',
+    v3Record('R-1-W', lane(1) + gml(LINE_E) + OLR_E, {
+      periods: true,
+      before: `<sit:impact><sit:numberOfLanesRestricted>1</sit:numberOfLanesRestricted><sit:originalNumberOfLanes>2</sit:originalNumberOfLanes><sit:residualRoadWidth>3.25</sit:residualRoadWidth></sit:impact><sit:forVehiclesWithCharacteristicsOf><vehicleType>lorry</vehicleType></sit:forVehiclesWithCharacteristicsOf>`,
+      after: `<sit:roadMaintenanceType>roadworks</sit:roadMaintenanceType>`,
+    }),
+    v3Record('R-1-S', lane(1) + gml(LINE_E) + OLR_E, {
+      type: 'SpeedManagement',
+      periods: true,
+      after: `<sit:complianceOption>mandatory</sit:complianceOption><sit:speedManagementType>speedRestrictionInOperation</sit:speedManagementType><sit:temporarySpeedLimit>60</sit:temporarySpeedLimit>`,
+    }),
+  ),
+  v3Situation(
+    'R-2',
+    v3Record('R-2-W', gml(LINE_E) + OLR_E, { type: 'ConstructionWorks', created: '2026-05-01T00:00:00Z', after: `<sit:constructionWorkType>constructionWork</sit:constructionWorkType>` }),
+    v3Record('R-2-C', gml(LINE_E) + OLR_E, {
+      type: 'RoadOrCarriagewayOrLaneManagement',
+      created: '2026-05-01T00:00:00Z',
+      after: `<sit:complianceOption>mandatory</sit:complianceOption><sit:roadOrCarriagewayOrLaneManagementType>roadClosed</sit:roadOrCarriagewayOrLaneManagementType>`,
+    }),
+  ),
+)
+
+/** One planned roadworks situation per direction variant (see the RTTI direction sub-criterion). */
+export const V3_DIRECTIONS = v3Doc(
+  v3Situation('D-FWD', v3Record('D-FWD-R', gml(LINE_E) + OLR_E)),
+  v3Situation('D-BWD', v3Record('D-BWD-R', gml(LINE_W) + OLR_E)),
+  // ~72 m polyline near the end of a long OpenLR line: a "nearer end" rule would read it backwards.
+  v3Situation('D-SHORT', v3Record('D-SHORT-R', gml('50.00001 8.01301 50.00002 8.01404') + v3OpenlrLine(v3Lrp(50, 8.0, 1150) + v3Lrp(50, 8.015, undefined, true), 935, 72))),
+  v3Situation('D-FAR', v3Record('D-FAR-R', gml(LINE_E) + v3OpenlrLine(v3Lrp(50.05, 7.999, 1150) + v3Lrp(50.05, 8.015, undefined, true)))),
+  v3Situation(
+    'D-REL-CODE',
+    v3Record(
+      'D-REL-CODE-R',
+      gml(LINE_E) +
+        `<loc:linearWithinLinearElement><loc:directionRelativeOnLinearSection>aligned</loc:directionRelativeOnLinearSection><loc:linearElement xsi:type="loc:LinearElementByCode"><loc:linearElementIdentifier>B 9</loc:linearElementIdentifier></loc:linearElement></loc:linearWithinLinearElement>`,
+    ),
+  ),
+  v3Situation(
+    'D-REL-LS',
+    v3Record(
+      'D-REL-LS-R',
+      gml(LINE_E) +
+        `<loc:linearWithinLinearElement><loc:directionRelativeOnLinearSection>aligned</loc:directionRelativeOnLinearSection><loc:linearElement xsi:type="loc:LinearElementByLineString"><loc:gmlLineString><loc:posList>${LINE_E}</loc:posList></loc:gmlLineString></loc:linearElement></loc:linearWithinLinearElement>`,
+    ),
+  ),
+  v3Situation('D-ALERTC', v3Record('D-ALERTC-R', gml(LINE_E) + alertC('<loc:alertCDirectionCoded>positive</loc:alertCDirectionCoded>'))),
+  v3Situation(
+    'D-DISAGREE',
+    v3Record('D-DISAGREE-R', gml(LINE_E) + OLR_E + alertC('<loc:alertCDirectionCoded>positive</loc:alertCDirectionCoded><loc:alertCAffectedDirection>both</loc:alertCAffectedDirection>')),
+  ),
+  v3Situation('D-POINT', v3Record('D-POINT-R', `<loc:pointByCoordinates><loc:pointCoordinates><loc:latitude>50.00012</loc:latitude><loc:longitude>8.00034</loc:longitude></loc:pointCoordinates></loc:pointByCoordinates>`, { locType: 'PointLocation' })),
+)
+
+/** v2 roadworks with every lane restricted but no closure record (RTTI-TERM-01). */
+export const V2_ALL_LANES = v2Doc(
+  v2Situation(
+    'T-1',
+    v2Record('T-1-W', `<linearExtension><linearExtended><gmlLineString><posList>${LINE_A}</posList></gmlLineString></linearExtended></linearExtension>`, `
+        <impact><numberOfLanesRestricted>2</numberOfLanesRestricted><originalNumberOfLanes>2</originalNumberOfLanes></impact>`),
+  ),
+)
+
+/** v2 urgent roadworks (unplanned). */
+export const V2_URGENT = v2Doc(
+  v2Situation(
+    'U-1',
+    v2Record('U-1-W', `<linearExtension><linearExtended><gmlLineString><posList>${LINE_A}</posList></gmlLineString></linearExtended></linearExtension>`, `
+        <urgentRoadworks>true</urgentRoadworks>`),
+  ),
+)

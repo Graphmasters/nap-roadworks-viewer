@@ -1,8 +1,9 @@
 // Converts one DATEX II `situation` element tree (v2 or v3) into the normalised model. Both
 // versions share most local names, so the code matches on local names and ignores prefixes.
 
-import type { LaneCode, LaneImpact, RestrictionType, RoadEvent, Situation, TypeBasis } from '../model'
+import type { LaneCode, LaneDetail, LaneImpact, RestrictionType, RoadEvent, Situation, TypeBasis } from '../model'
 import { laneEvidenceOf, laneStatesFromCode } from '../lanes/codes'
+import { decodeOpenlr } from '../location/openlr'
 import {
   child,
   childrenNamed,
@@ -42,10 +43,9 @@ const LOCATION_METHODS: Record<string, string> = {
   gmlLineString: 'gmlLineString',
   pointCoordinates: 'pointCoordinates',
   locationForDisplay: 'locationForDisplay',
+  coordinatesForDisplay: 'coordinatesForDisplay',
   alertCLinear: 'alertC (linear)',
   alertCPoint: 'alertC (point)',
-  openlrLocationReferencePoint: 'OpenLR',
-  openlrPointLocationReference: 'OpenLR',
   tpegLinearLocation: 'TPEG (linear)',
   tpegPointLocation: 'TPEG (point)',
   linearWithinLinearElement: 'linear element reference',
@@ -54,13 +54,18 @@ const LOCATION_METHODS: Record<string, string> = {
   namedArea: 'named area',
 }
 
+/** Display-only point elements: v2 `locationForDisplay`, v3 `coordinatesForDisplay`. */
+export const DISPLAY_POINT_ELEMENTS = ['locationForDisplay', 'coordinatesForDisplay']
+
 /** Raw coordinates kept until the file-wide axis order is known. */
 export interface PendingGeometry {
   lines: number[][]
   /** Points with explicit latitude/longitude elements (unambiguous axis order). */
   points: Array<[lat: number, lon: number]>
-  /** True when `points` come only from `locationForDisplay`. */
+  /** True when `points` come only from display points (`locationForDisplay`, `coordinatesForDisplay`). */
   displayOnly: boolean
+  /** Largest number of significant decimals in posList and pointCoordinates text. */
+  coordinateDecimals?: number
   warnings: string[]
 }
 
@@ -133,6 +138,56 @@ function commentsOf(rec: XmlElement): RoadEvent['comments'] {
 function deepestText(el: XmlElement | undefined, local: string): string | undefined {
   for (const d of descendants(el, local)) if (d.text) return d.text
   return undefined
+}
+
+function textsOf(el: XmlElement | undefined, ...locals: string[]): string[] {
+  const out: string[] = []
+  for (const l of locals) for (const d of descendants(el, l)) if (d.text) out.push(d.text)
+  return [...new Set(out)]
+}
+
+function laneDetailOf(rec: XmlElement): LaneDetail {
+  const laneNumbers = new Set<string>()
+  const laneUsages = new Set<string>()
+  let withUsage = false
+  let usageOnly = false
+  for (const lane of descendants(rec, 'lane')) {
+    const n = textAt(lane, 'laneNumber')
+    const u = textAt(lane, 'laneUsage')
+    if (n) laneNumbers.add(n)
+    if (u) laneUsages.add(u)
+    if (n && u) withUsage = true
+    else if (u) usageOnly = true
+    // v2 `affectedCarriagewayAndLanes/lane` is an enumeration value such as `lane1`.
+    if (!lane.children.length && lane.text) laneNumbers.add(lane.text)
+  }
+  for (const n of textsOf(rec, 'laneNumber')) laneNumbers.add(n)
+  for (const u of textsOf(rec, 'laneUsage')) laneUsages.add(u)
+  return {
+    laneNumbers: [...laneNumbers],
+    laneUsages: [...laneUsages],
+    laneNumberWithUsage: withUsage,
+    laneUsageWithoutNumber: usageOnly,
+    residualRoadWidth: num(deepestText(rec, 'residualRoadWidth')),
+  }
+}
+
+/** Leaf values below vehicle-characteristics elements, as `element=value`. */
+function vehicleCharacteristicsOf(rec: XmlElement): string[] {
+  const out = new Set<string>()
+  for (const local of ['forVehiclesWithCharacteristicsOf', 'vehicleCharacteristics']) {
+    for (const vc of descendants(rec, local)) {
+      for (const e of walk(vc)) if (!e.children.length && e.text) out.add(`${e.local}=${e.text}`)
+    }
+  }
+  return [...out].slice(0, 20)
+}
+
+/** Significant decimals of a coordinate token (trailing zeros do not count). */
+function decimalsOf(token: string): number {
+  const i = token.indexOf('.')
+  if (i < 0) return 0
+  return token.slice(i + 1).replace(/[eE].*$/, '').replace(/0+$/, '').length
 }
 
 function normaliseRecord(
@@ -212,6 +267,9 @@ function normaliseRecord(
     if (m) methods.add(m)
   }
   const geometry = collectGeometry(location, warnings)
+  const openlr = decodeOpenlr(location, basePath)
+  if (openlr.some((r) => r.encoding === 'structured')) methods.add('OpenLR (structured)')
+  if (openlr.some((r) => r.encoding === 'binary')) methods.add('OpenLR (binary)')
 
   const comments = commentsOf(rec)
   const description =
@@ -242,11 +300,33 @@ function normaliseRecord(
     direction:
       deepestText(location, 'directionRelativeOnLinearSection') ??
       deepestText(location, 'alertCAffectedDirection') ??
+      deepestText(location, 'alertCDirectionCoded') ??
       deepestText(location, 'tpegDirection') ??
       deepestText(location, 'directionBoundOnLinearSection'),
     laneCodes,
     laneStates,
     laneImpact,
+    createdAt: textAt(rec, 'situationRecordCreationTime'),
+    versionTime: textAt(rec, 'situationRecordVersionTime'),
+    firstSupplierVersionTime: textAt(rec, 'situationRecordFirstSupplierVersionTime'),
+    probabilityOfOccurrence: textAt(rec, 'probabilityOfOccurrence'),
+    urgentRoadworks: ((u) => (u === undefined ? undefined : u === 'true' || u === '1'))(deepestText(rec, 'urgentRoadworks')),
+    roadworksDuration: deepestText(rec, 'roadworksDuration'),
+    mobilityType: deepestText(rec, 'mobilityType'),
+    workTypes: textsOf(rec, 'roadMaintenanceType', 'maintenanceWorkType', 'constructionWorkType'),
+    operatorActionStatus: deepestText(rec, 'operatorActionStatus'),
+    laneDetail: laneDetailOf(rec),
+    speedManagementTypes: textsOf(rec, 'speedManagementType'),
+    temporarySpeedLimit: num(deepestText(rec, 'temporarySpeedLimit')),
+    generalNetworkManagementTypes: textsOf(rec, 'generalNetworkManagementType'),
+    vehicleCharacteristics: vehicleCharacteristicsOf(rec),
+    directionRelative: deepestText(location, 'directionRelativeOnLinearSection'),
+    directionBound: deepestText(location, 'directionBoundOnLinearSection'),
+    alertCAffectedDirection: deepestText(location, 'alertCAffectedDirection'),
+    linearElementKind: xsiType(firstDescendant(location, 'linearElement')),
+    coordinateDecimals: geometry.coordinateDecimals,
+    referencePoints: geometry.points.map(([lat, lon]) => [lat, lon] as [number, number]),
+    openlr,
     xmlPath: xmlPath(rec, basePath),
     span: { start: rec.start, end: rec.end, line: rec.line },
     situationSpan,
@@ -257,11 +337,19 @@ function normaliseRecord(
 
 function collectGeometry(location: XmlElement, warnings: string[]): PendingGeometry {
   const lines: number[][] = []
+  let decimals: number | undefined
+  // Only values that can be WGS 84 degrees count: projected coordinates (metres) say nothing
+  // about the resolution in degrees.
+  const noteDecimals = (tokens: Array<string | undefined>) => {
+    for (const t of tokens) if (t && Math.abs(Number(t)) <= 180) decimals = Math.max(decimals ?? 0, decimalsOf(t))
+  }
   for (const ls of descendants(location, 'gmlLineString')) {
     const pl = child(ls, 'posList') ?? firstDescendant(ls, 'posList')
     if (!pl) continue
     const dim = Number(pl.attrs['srsDimension'] ?? ls.attrs['srsDimension'] ?? 2) || 2
-    const values = pl.text.split(/[\s,]+/).filter(Boolean).map(Number)
+    const tokens = pl.text.split(/[\s,]+/).filter(Boolean)
+    if (tokens.every((t) => Math.abs(Number(t)) <= 180)) noteDecimals(tokens)
+    const values = tokens.map(Number)
     if (values.some((v) => !Number.isFinite(v))) {
       warnings.push('posList contains values that are not numbers')
       continue
@@ -281,17 +369,22 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
   const points: Array<[number, number]> = []
   let displayOnly = true
   for (const pc of descendants(location, 'pointCoordinates')) {
+    // OpenLR coordinates are read by the OpenLR decoder, not as point geometry.
+    if (pc.parent && pc.parent.local.toLowerCase().startsWith('openlr')) continue
     const lat = num(textAt(pc, 'latitude'))
     const lon = num(textAt(pc, 'longitude'))
     if (lat !== undefined && lon !== undefined) {
       points.push([lat, lon])
       displayOnly = false
+      noteDecimals([textAt(pc, 'latitude'), textAt(pc, 'longitude')])
     }
   }
-  for (const lfd of descendants(location, 'locationForDisplay')) {
-    const lat = num(textAt(lfd, 'latitude'))
-    const lon = num(textAt(lfd, 'longitude'))
-    if (lat !== undefined && lon !== undefined) points.push([lat, lon])
+  for (const local of DISPLAY_POINT_ELEMENTS) {
+    for (const lfd of descendants(location, local)) {
+      const lat = num(textAt(lfd, 'latitude'))
+      const lon = num(textAt(lfd, 'longitude'))
+      if (lat !== undefined && lon !== undefined) points.push([lat, lon])
+    }
   }
-  return { lines, points, displayOnly: points.length > 0 && displayOnly, warnings }
+  return { lines, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
 }

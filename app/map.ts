@@ -8,7 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { decodeTileFeatureId, type OsmWay } from 'osm-lanes'
 import type { Feature, FeatureCollection } from 'geojson'
-import type { LonLat, MatchResult, RecordPassability, RoadEvent } from '../src/index'
+import { validWgs84, type LonLat, type MatchResult, type RecordPassability, type RoadEvent } from '../src/index'
 import { readRoadCandidates, type TileRead } from './tiles'
 
 // MapLibre 6 resolves its worker file at runtime, which bundlers cannot follow; hand it the
@@ -90,6 +90,11 @@ const EVENTS = 'nrv-events'
 const SEL: maplibregl.ExpressionSpecification = ['boolean', ['feature-state', 'selected'], false]
 const WAY = 'nrv-way'
 const CANDIDATES = 'nrv-candidates'
+/** The selected record's polyline, for direction chevrons. */
+const DETAIL = 'nrv-detail'
+/** The selected record's decoded OpenLR location reference points. */
+const OPENLR = 'nrv-openlr'
+const OPENLR_COLOR = '#0f766e'
 
 export class RoadworksMap {
   readonly map: maplibregl.Map
@@ -132,6 +137,8 @@ export class RoadworksMap {
     this.map.addSource(WAY, { type: 'geojson', data: empty })
     this.map.addSource(CANDIDATES, { type: 'geojson', data: empty })
     this.map.addSource(EVENTS, { type: 'geojson', data: empty, promoteId: 'i' })
+    this.map.addSource(DETAIL, { type: 'geojson', data: empty })
+    this.map.addSource(OPENLR, { type: 'geojson', data: empty })
 
     this.map.addLayer({
       id: `${CANDIDATES}-line`,
@@ -218,7 +225,60 @@ export class RoadworksMap {
         'icon-ignore-placement': true,
       },
     })
+    // Selected record: chevrons along its polyline show the vertex order; OpenLR LRPs on top.
+    this.map.addLayer({
+      id: `${DETAIL}-direction`,
+      type: 'symbol',
+      source: DETAIL,
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 10, 40, 14, 60, 18, 120],
+        'icon-image': DIRECTION_ICON,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.45, 14, 0.6, 18, 1.1],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+      },
+    })
+    this.map.addLayer({
+      id: `${OPENLR}-line`,
+      type: 'line',
+      source: OPENLR,
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: { 'line-color': OPENLR_COLOR, 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
+    })
+    this.map.addLayer({
+      id: `${OPENLR}-point`,
+      type: 'circle',
+      source: OPENLR,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': ['match', ['get', 'role'], 'mid', 5, 7],
+        'circle-color': ['match', ['get', 'role'], 'first', '#16a34a', 'last', '#b91c1c', '#ffffff'],
+        'circle-stroke-color': OPENLR_COLOR,
+        'circle-stroke-width': 2.5,
+      },
+    })
     this.updateHint()
+  }
+
+  /** Shows the selected record's polyline direction and its decoded OpenLR LRPs; null clears both. */
+  async showDetail(e: RoadEvent | null) {
+    await this.ready
+    const lines: Feature[] = []
+    const g = e?.geometry
+    if (g?.type === 'LineString') lines.push({ type: 'Feature', properties: {}, geometry: g })
+    else if (g?.type === 'MultiLineString') for (const c of g.coordinates) lines.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } })
+    ;(this.map.getSource(DETAIL) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines })
+    const features: Feature[] = []
+    for (const r of e?.openlr ?? []) {
+      const pts = r.lrps.filter(validWgs84).map((p) => [p.lon, p.lat] as [number, number])
+      if (pts.length > 1) features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } })
+      pts.forEach((c, i) =>
+        features.push({ type: 'Feature', properties: { role: i === 0 ? 'first' : i === pts.length - 1 ? 'last' : 'mid', n: i + 1 }, geometry: { type: 'Point', coordinates: c } }),
+      )
+    }
+    ;(this.map.getSource(OPENLR) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features })
   }
 
   whenReady(): Promise<void> {

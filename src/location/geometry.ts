@@ -91,13 +91,54 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
     event.geometry = pts.length === 1 ? { type: 'Point', coordinates: pts[0]! } : { type: 'MultiPoint', coordinates: pts }
     event.geometryConfidence = 'approximate'
     event.geometryNote = g.displayOnly
-      ? 'Only a display point (locationForDisplay). The extent of the restriction is not represented.'
+      ? 'Only a display point (locationForDisplay / coordinatesForDisplay). The extent of the restriction is not represented.'
       : 'Only point coordinates. The extent of the restriction along the road is not represented.'
     return
   }
   event.geometryConfidence = 'none'
-  const other = event.locationMethods.filter((m) => m !== 'gmlLineString' && m !== 'pointCoordinates' && m !== 'locationForDisplay')
+  const other = event.locationMethods.filter((m) => !['gmlLineString', 'pointCoordinates', 'locationForDisplay', 'coordinatesForDisplay'].includes(m))
   event.geometryNote = other.length
     ? `Location uses ${other.join(', ')}, which this viewer does not decode. It is reported here but not drawn.`
     : 'The record has no location reference with coordinates.'
+}
+
+/** Distance in metres from a point to the nearest segment of a lon/lat polyline (local projection). */
+export function distanceToLineM(lat: number, lon: number, line: Array<[number, number]> | number[][]): number {
+  if (!line.length) return Infinity
+  const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
+  const ky = 110_574
+  const px = 0
+  const py = 0
+  let best = Infinity
+  for (let i = 0; i < line.length; i++) {
+    const ax = (line[i]![0]! - lon) * kx
+    const ay = (line[i]![1]! - lat) * ky
+    if (line.length === 1) return Math.hypot(ax, ay)
+    if (i === line.length - 1) break
+    const bx = (line[i + 1]![0]! - lon) * kx
+    const by = (line[i + 1]![1]! - lat) * ky
+    const dx = bx - ax
+    const dy = by - ay
+    const len2 = dx * dx + dy * dy
+    const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0
+    best = Math.min(best, Math.hypot(ax + t * dx - px, ay + t * dy - py))
+  }
+  return best
+}
+
+/** Initial bearing in degrees (0 = north, clockwise) from point 1 to point 2. */
+export function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = Math.PI / 180
+  const p1 = lat1 * toRad
+  const p2 = lat2 * toRad
+  const dl = (lon2 - lon1) * toRad
+  const y = Math.sin(dl) * Math.cos(p2)
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+  return ((Math.atan2(y, x) / toRad) + 360) % 360
+}
+
+/** Smallest absolute difference between two bearings, 0–180. */
+export function angleDiff(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360
+  return d > 180 ? 360 - d : d
 }

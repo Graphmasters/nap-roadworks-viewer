@@ -3,7 +3,7 @@
 
 import { renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
-import { compareLanes, laneCategoriesOf, osmLaneAttributes, WEIGHTS, type AnalysisResult, type RefinedMatchResult, type RoadEvent } from '../src/index'
+import { compareLanes, describeOpenlr, laneCategoriesOf, osmLaneAttributes, validWgs84, WEIGHTS, type AnalysisResult, type OpenlrReference, type RefinedMatchResult, type RoadEvent } from '../src/index'
 import { append, badge, clear, dl, formatTime, h, link, spinner, type Child } from './dom'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
@@ -96,12 +96,18 @@ function renderRecord(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
       ['Management', e.managementTypes.length ? [e.managementTypes.join(', '), prov('DATEX II')] : undefined],
       ['Compliance', e.complianceOption],
       ['Cause', [e.causeType, e.causeRecordIds.length ? ` → ${e.causeRecordIds.join(', ')}` : ''].join('') || undefined],
+      ['Created', e.createdAt ? formatTime(e.createdAt) : undefined],
+      ['Version time', e.versionTime ? formatTime(e.versionTime) : undefined],
       ['Valid from', formatTime(e.validFrom)],
       ['Valid to', formatTime(e.validTo)],
       ['Validity', [e.validityStatus, e.hasPeriods ? ' · restricted periods' : ''].join('') || undefined],
       ['Road', [e.roadNumber, e.roadName].filter(Boolean).join(' · ') || undefined],
       ['Carriageway', e.carriageway],
       ['Direction', e.direction],
+      ['Work type', e.workTypes.join(', ') || undefined],
+      ['Lane detail', laneDetailText(e) || undefined],
+      ['Speed', [e.speedManagementTypes.join(', '), e.temporarySpeedLimit !== undefined ? `${e.temporarySpeedLimit} km/h` : ''].filter(Boolean).join(' · ') || undefined],
+      ['Vehicles', e.vehicleCharacteristics.join(', ') || undefined],
       ['Lanes', e.laneCodes.length ? e.laneCodes.map((c) => `${c.field}=${c.value}`).join(', ') : undefined],
       ['Lane impact', laneImpactText(e) || undefined],
       ['Location methods', e.locationMethods.join(', ') || 'none'],
@@ -110,6 +116,7 @@ function renderRecord(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
       ['Line', String(e.span.line)],
     ]),
   )
+  append(el, h('h3', null, 'OpenLR'), e.openlr.length ? e.openlr.map(openlrBlock) : h('p', { class: 'muted' }, 'none'))
   if (e.comments.length) {
     const list = h('ul', { class: 'compact' })
     for (const c of e.comments) list.append(h('li', null, c.type ? h('span', { class: 'muted' }, `${c.type}: `) : null, c.text, c.lang ? h('span', { class: 'muted' }, ` [${c.lang}]`) : null))
@@ -117,6 +124,58 @@ function renderRecord(el: HTMLElement, r: AnalysisResult, e: RoadEvent) {
   }
   if (p) append(el, h('h3', null, 'Passability'), h('ul', { class: 'compact' }, ...p.reasons.map((x) => h('li', null, x))), h('p', { class: 'muted' }, `Routing action: ${p.routingAction.replace(/_/g, ' ')}. An analysis hypothesis, not a legal statement.`))
   if (e.warnings.length) append(el, h('h3', null, 'Warnings'), h('ul', { class: 'compact' }, ...e.warnings.map((w) => h('li', null, w))))
+}
+
+function laneDetailText(e: RoadEvent): string {
+  const d = e.laneDetail
+  return [
+    d.laneNumbers.length ? `lane ${d.laneNumbers.join(', ')}` : '',
+    d.laneUsages.length ? `usage ${d.laneUsages.join(', ')}` : '',
+    d.residualRoadWidth !== undefined ? `residual width ${d.residualRoadWidth} m` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** Decoded OpenLR reference: summary line and a table of its location reference points. */
+function openlrBlock(r: OpenlrReference): HTMLElement {
+  const wrap = h('div', { class: 'openlr' })
+  append(
+    wrap,
+    h('p', null, describeOpenlr(r)),
+    dl([
+      ['Point type', r.pointType],
+      ['Offsets', r.positiveOffset !== undefined || r.negativeOffset !== undefined ? `+${r.positiveOffset ?? 0} m / −${r.negativeOffset ?? 0} m` : undefined],
+      ['Orientation', r.orientation],
+      ['Side of road', r.sideOfRoad],
+      ['Binary', r.binaryLength !== undefined ? `${r.binaryLength} characters, not decoded` : undefined],
+      ['XML path', h('code', { class: 'wrap' }, r.xmlPath)],
+    ]),
+  )
+  if (r.lrps.length) {
+    const head = h('tr', null, ...['#', 'lat', 'lon', 'FRC', 'FOW', 'bearing', 'LFRCNP', 'DNP'].map((t) => h('th', null, t)))
+    const body = h('tbody')
+    r.lrps.forEach((p, i) => {
+      const ok = validWgs84(p)
+      body.append(
+        h(
+          'tr',
+          { class: ok ? '' : 'invalid', title: ok ? '' : 'Not a valid WGS 84 position in decimal degrees' },
+          h('td', null, `${i + 1}${p.last ? ' (last)' : ''}`),
+          h('td', null, p.rawLat ?? '–'),
+          h('td', null, p.rawLon ?? '–'),
+          h('td', null, p.frc ?? ''),
+          h('td', null, p.fow ?? ''),
+          h('td', null, p.bearing !== undefined ? `${p.bearing}°` : ''),
+          h('td', null, p.lfrcnp ?? ''),
+          h('td', null, p.dnp !== undefined ? `${p.dnp} m` : ''),
+        ),
+      )
+    })
+    wrap.append(h('div', { class: 'table-scroll' }, h('table', { class: 'lrp' }, h('thead', null, head), body)))
+    wrap.append(h('p', { class: 'muted' }, 'On the map: first LRP green, last red, dashed line in LRP order; chevrons along the record polyline show its vertex order.'))
+  }
+  return wrap
 }
 
 function laneImpactText(e: RoadEvent): string {

@@ -28,6 +28,8 @@ compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswi
 | **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
 | **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
 | **Passability** | Per record: passable, restricted, closed, conditional, conflicting or unknown, plus the routing action (block, do not block, manual review). |
+| **OpenLR** | Whether the feed carries OpenLR, per record and in total. Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2 `openlrExtendedLinear` / `openlrExtendedPoint`) is decoded: location reference points with coordinates, FRC, form of way, bearing, LFRCNP, DNP, offsets. Its coordinates are checked as WGS 84 decimal degrees (`OLR-001`…`OLR-006`). The inspector lists the points; the map marks them for the selected record. Binary OpenLR is detected, not decoded. |
+| **RTTI 5-Star** | Star-level ceilings per criterion of the [TISA RTTI 5-Star Rating Specification](https://tisa.org/rtti-5-star-rating-specification/) for planned and unplanned roadworks and road closures (see below). |
 
 ### DQ-RW-001: closure that contradicts its cause
 
@@ -48,10 +50,53 @@ The finding never claims the road is passable. It recommends manual review and n
 road in routing on this record alone. `DQ-RW-002` covers a closure whose lane status keeps lanes in
 both directions open.
 
+### RTTI 5-Star indicators
+
+The [TISA RTTI 5-Star Rating Specification v1.0](https://tisa.org/rtti-5-star-rating-specification/)
+(21 October 2025) rates roadworks and road-closure data per criterion from 1★ to 5★ (Tables 15–18).
+The viewer sorts each situation into one of the four use cases and shows, per criterion, the
+**highest level this file allows**: a ceiling, not a rating. The feed cannot score higher on that
+criterion, but it may score lower once the criteria a file cannot show are measured. TISA's
+Evaluation Methodology is not published yet. The viewer shows no overall star value.
+
+| Criterion | Checked in the file | Ceiling |
+|---|---|---|
+| Data format used | DATEX II version; reference-profile conformance (heuristic, plus your XSD run) | v2 3★, v3 4★, v3 conformant 5★ |
+| Use of specification | Record types and value lists of the [DATEX II RTTI reference profile](https://docs.datex2.eu/recommended-profiles/rrp/rtti/); one encoding per category (`RTTI-SPEC-01/02`) | deviation 2★ |
+| Terminology & definition | Roadworks keep a lane open, closures close all lanes in a direction (`RTTI-TERM-01`, `DQ-RW-001/002`) | conflict 2★ |
+| Location referencing | Best method per record: OpenLR with valid WGS 84 points, ALERT-C, coordinates (`RTTI-LOC-01`) | 5★ / 4★ / 3★ (2★ for unplanned closures) / 0 |
+| Linear referencing | A polyline (`gmlLineString`) on every record (`RTTI-LIN-01/02/03`) | missing 0 |
+| ↳ Direction | Only on records with a polyline: is the traffic direction along it unambiguous? Counts: both directions affected; OpenLR whose end points match the polyline ends within the OpenLR offsets; `aligned`/`opposite` on a linear element given by coordinates; a compass direction matching the polyline bearing. Vertex order alone, ALERT-C direction (relative to the location table) or `aligned` on a coded road are ambiguous (`RTTI-DIR-01`); OpenLR that does not fit the polyline is a contradiction (`RTTI-DIR-02`); references that disagree make it ambiguous (`RTTI-DIR-03`) | not unambiguous 2★ |
+| Accuracy | Upper bound from coordinate resolution (significant decimals) (`RTTI-ACC-01`); points far from their own polyline (`RTTI-ACC-02`) | per distance thresholds |
+| Correctness | Share of records without internal contradictions | per % thresholds |
+| Completeness | Attribute completeness (start, end, polyline, direction, effect or cause), as the spec defines it for events | per % thresholds |
+| RTTI event message ID | id, version and version time on every record; no reused ids; probable duplicates (`RTTI-ID-01/02`) | problem 2★ |
+| Outdated messages | Age of ended records at `publicationTime` | 24 h 5★ … 4 weeks 1★ |
+| Validity, road type, lane level, vehicle classes, cause type | Start/end and schedules (`RTTI-VAL-01`), lane detail per situation, vehicle characteristics, closure causes (`RTTI-CAUSE-01`) | per table |
+| Pre-announcement, short-term events | Lead time from creation to start; unplanned works present | shown, no level |
+| Update cycle, timeliness, secure API, ID stability | Not visible in one file; the panel says what is needed (repeated downloads, the access URL). Missing creation or version times are reported (`RTTI-TIME-01`) | — |
+
+Assumptions:
+- **Planned vs unplanned.** `urgentRoadworks`, else the lead time from `situationRecordCreationTime`
+  to `overallStartTime`: 24 h or more is planned. This boundary is the viewer's choice, not the spec's.
+- **FRC is unknown.** Direction is required on every record, although the spec asks for it on FRC 3–6
+  only. Accuracy, correctness and completeness use the looser of the FRC1–4 and FRC5–6 thresholds.
+- **Out of scope** (listed, not rated): moving or mobile maintenance, lane restrictions without a
+  roadworks cause, other record types. Static speed limits (Table 13) come via TN-ITS, not in a
+  SituationPublication.
+- **Capability checks.** Schedules and vehicle classes count once the feed uses them anywhere.
+- **Polylines in other coordinate systems.** A `gmlLineString` in another CRS (e.g. `srsName="25833"`)
+  counts as a polyline, but its direction and accuracy are not checked (`RTTI-LIN-03`).
+
+To run the checks against your own downloads, point the opt-in test at them:
+`DATEX_SAMPLES_DIR="/path/to/feeds" npx vitest run test/samples.test.ts`.
+
 ## Limitations
 
-- **Location referencing.** Only `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) is
-  drawn as a line. AlertC, OpenLR, TPEG and linear-element references are listed, not decoded.
+- **Location referencing.** Only `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in
+  WGS 84 degrees is drawn as a line. AlertC, TPEG and linear-element references are listed, not
+  decoded. Structured OpenLR is decoded and its points are marked for the selected record, but OpenLR
+  is not map-matched into a line; binary OpenLR is not decoded.
   The `posList` axis order is "lat lon" per EPSG:4326. "lon lat" files are detected from explicit
   latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds. They
