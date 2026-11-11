@@ -148,7 +148,7 @@ function renderReportPanel() {
         select(i, true)
       }
     },
-  })
+  }, { source: 'file' })
   renderReport(reportEl, result, xsd, {
     onProfile: (id) => {
       profileOverride = id
