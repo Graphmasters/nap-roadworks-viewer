@@ -5,7 +5,8 @@
 // coordinates outside ±90 settle it, otherwise explicit latitude/longitude points of the same
 // record (pointCoordinates, locationForDisplay) are compared with both readings.
 
-import type { AxisOrder, AxisOrderDecision, RoadEvent } from '../model'
+import type { AxisOrder, AxisOrderDecision, GeometrySource, OpenlrReference, RoadEvent } from '../model'
+import { validWgs84 } from './openlr'
 import type { PendingGeometry } from '../records/normalise'
 
 export interface AxisVotes {
@@ -71,7 +72,53 @@ function toLonLat(flat: number[], order: AxisOrder): Array<[number, number]> | u
   return out
 }
 
-/** Sets geometry, confidence and note on the event. */
+/**
+ * Straight line through the LRPs of the first usable structured OpenLR line reference, trimmed by
+ * its offsets. OpenLR carries no road shape between LRPs (a decoder finds the shortest path in its
+ * own map, OpenLR white paper v1.5 §5.1), so this is only a chord. Offsets are metres along the
+ * location reference path; they are scaled to the chord by DNP sum / chord length.
+ */
+export function openlrChord(refs: OpenlrReference[]): { coords: Array<[lon: number, lat: number]>; note: string } | undefined {
+  const lines = refs
+    .filter((r) => r.encoding === 'structured' && r.kind === 'line' && r.lrps.length >= 2 && r.lrps.every(validWgs84))
+    .sort((a, b) => Number(b.role === 'firstDirection') - Number(a.role === 'firstDirection'))
+  const r = lines[0]
+  if (!r) return undefined
+  const pts = r.lrps.map((p) => [p.lat!, p.lon!] as [number, number])
+  const cum = [0]
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1]! + distanceM(pts[i - 1]![0], pts[i - 1]![1], pts[i]![0], pts[i]![1]))
+  const chord = cum[cum.length - 1]!
+  if (chord === 0) return undefined
+  const dnps = r.lrps.slice(0, -1).map((p) => p.dnp)
+  const path = dnps.every((d): d is number => d !== undefined && d > 0) ? dnps.reduce((a, b) => a + b, 0) : chord
+  const scale = chord / path
+  const poff = (r.positiveOffset ?? 0) * scale
+  const noff = (r.negativeOffset ?? 0) * scale
+  const at = (d: number): [number, number] => {
+    let i = 1
+    while (i < cum.length - 1 && cum[i]! < d) i++
+    const seg = cum[i]! - cum[i - 1]!
+    const t = seg > 0 ? Math.max(0, Math.min(1, (d - cum[i - 1]!) / seg)) : 0
+    const [alat, alon] = pts[i - 1]!
+    const [blat, blon] = pts[i]!
+    return [alat + t * (blat - alat), alon + t * (blon - alon)]
+  }
+  const trimmed = poff + noff > 0 && poff + noff < chord
+  const latlon = trimmed ? [at(poff), ...pts.filter((_, i) => cum[i]! > poff && cum[i]! < chord - noff), at(chord - noff)] : pts
+  const offsets = r.positiveOffset || r.negativeOffset ? ` Offsets ${r.positiveOffset ?? 0} m / ${r.negativeOffset ?? 0} m ${trimmed ? 'applied in proportion' : 'leave nothing of the line and are ignored'}.` : ''
+  return {
+    coords: latlon.map(([lat, lon]) => [round(lon), round(lat)]),
+    note: `Straight line through the ${r.lrps.length} OpenLR location reference points${r.role ? ` (${r.role})` : ''}. OpenLR carries no road shape between its points, so the line cuts corners.${offsets}`,
+  }
+}
+
+const fmtM = (m: number) => `${Math.round(m)} m`
+
+/**
+ * Sets geometry, confidence and note on the event. Preference: gmlLineString, LinearElementByPoints
+ * (cut to fromPoint/toPoint), a straight line through structured OpenLR LRPs, a zero-length
+ * gmlLineString as a point, then loose point coordinates.
+ */
 export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisOrder): void {
   event.warnings.push(...g.warnings)
   const lines: Array<Array<[number, number]>> = []
@@ -87,25 +134,52 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
     event.zeroLengthLine = [zeroLength[1], zeroLength[0]]
     if (lines.length) event.warnings.push('A gmlLineString has zero length (all positions are the same point) and is not drawn.')
   }
+  const set = (geometry: NonNullable<RoadEvent['geometry']>, source: GeometrySource, confidence: RoadEvent['geometryConfidence'], note: string) => {
+    event.geometry = geometry
+    event.geometrySource = source
+    event.geometryConfidence = confidence
+    event.geometryNote = note
+  }
+  const line = (ls: Array<Array<[number, number]>>): NonNullable<RoadEvent['geometry']> =>
+    ls.length === 1 ? { type: 'LineString', coordinates: ls[0]! } : { type: 'MultiLineString', coordinates: ls }
+
   if (lines.length) {
-    event.geometry = lines.length === 1 ? { type: 'LineString', coordinates: lines[0]! } : { type: 'MultiLineString', coordinates: lines }
-    event.geometryConfidence = 'direct'
-    event.geometryNote = `Line geometry taken directly from DATEX II (gmlLineString, read as ${order === 'latlon' ? 'lat lon' : 'lon lat'}).`
+    set(line(lines), 'gmlLineString', 'direct', `Line geometry taken directly from DATEX II (gmlLineString, read as ${order === 'latlon' ? 'lat lon' : 'lon lat'}).`)
+    return
+  }
+  if (g.elementLines.length) {
+    const ls = g.elementLines.map((l) => l.coords.map(([lat, lon]) => [round(lon), round(lat)] as [number, number]))
+    const cuts = g.elementLines.filter((l) => l.cut)
+    const cutNote = cuts.length
+      ? ` Cut to ${cuts.map((l) => `${fmtM(l.cut!.fromM)}–${fmtM(l.cut!.toM)} of ${fmtM(l.elementLengthM)}${l.reversed ? ', reversed' : ''}`).join('; ')} (fromPoint/toPoint, measured along the points).`
+      : ''
+    set(line(ls), 'linearElementByPoints', 'direct', `Line through the points of the LinearElementByPoints (pointCoordinates in order).${cutNote}`)
+    return
+  }
+  const chord = openlrChord(event.openlr)
+  if (chord) {
+    set({ type: 'LineString', coordinates: chord.coords }, 'openlr', 'approximate', chord.note)
     return
   }
   if (zeroLength) {
-    event.geometry = { type: 'Point', coordinates: zeroLength }
-    event.geometryConfidence = 'approximate'
-    event.geometryNote = `The gmlLineString has zero length: all its positions are ${zeroLength[1]} ${zeroLength[0]} (lat lon). Drawn as a point; the extent of the restriction is not represented.`
+    set(
+      { type: 'Point', coordinates: zeroLength },
+      'gmlLineString',
+      'approximate',
+      `The gmlLineString has zero length: all its positions are ${zeroLength[1]} ${zeroLength[0]} (lat lon). Drawn as a point; the extent of the restriction is not represented.`,
+    )
     return
   }
   const pts = g.points.filter(([lat, lon]) => Math.abs(lat) <= 90 && Math.abs(lon) <= 180).map(([lat, lon]) => [round(lon), round(lat)] as [number, number])
   if (pts.length) {
-    event.geometry = pts.length === 1 ? { type: 'Point', coordinates: pts[0]! } : { type: 'MultiPoint', coordinates: pts }
-    event.geometryConfidence = 'approximate'
-    event.geometryNote = g.displayOnly
-      ? 'Only a display point (locationForDisplay / coordinatesForDisplay). The extent of the restriction is not represented.'
-      : 'Only point coordinates. The extent of the restriction along the road is not represented.'
+    set(
+      pts.length === 1 ? { type: 'Point', coordinates: pts[0]! } : { type: 'MultiPoint', coordinates: pts },
+      'points',
+      'approximate',
+      g.displayOnly
+        ? 'Only a display point (locationForDisplay / coordinatesForDisplay). The extent of the restriction is not represented.'
+        : 'Only point coordinates. The extent of the restriction along the road is not represented.',
+    )
     return
   }
   event.geometryConfidence = 'none'

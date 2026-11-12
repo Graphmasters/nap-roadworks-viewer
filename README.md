@@ -23,7 +23,7 @@ compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswi
 | **Profile checks** | Profile detection (MDM roadworks profile 04-00-00, NDW situation feeds, generic v2/v3) with heuristic rules, labelled as heuristics. |
 | **Extensions** | Official extension mechanisms (v2 `…Extension`, v3 `_…Extension`) apart from other namespaces, with element counts. |
 | **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. Feeds with lane status codes get a lane-configuration filter (reversible lane, hard shoulder open/closed, narrowed or closed lane, parking lane and restrictions, cycleway and pedestrian path open/closed) with lane-status-viewer icons, which also mark records in the Situation section of the Record tab. |
-| **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
+| **Map** | Lines, in order of preference: `gmlLineString`; the points of a `LinearElementByPoints`, cut to its `fromPoint`/`toPoint`; a straight line through structured OpenLR location reference points (*approximate*). Point-only records as points marked *approximate*; other location methods listed with a reason. The inspector reports OpenLR road classes (FRC, LFRCNP) as published, next to the OSM road class hierarchy for comparison. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
 | **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
@@ -114,10 +114,16 @@ repository contains no feed data. The folder names are those `test/samples.test.
 
 ## Limitations
 
-- **Location referencing.** Only `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in
-  WGS 84 degrees is drawn as a line. AlertC, TPEG and linear-element references are listed, not
-  decoded. Structured OpenLR is decoded and its points are marked for the selected record, but OpenLR
-  is not map-matched into a line; binary OpenLR is not decoded.
+- **Location referencing.** `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in WGS 84
+  degrees and `LinearElementByPoints` (cut to `fromPoint`/`toPoint`, distances measured along its
+  points) are drawn as lines. AlertC, TPEG and coded linear-element references are listed, not
+  decoded. Structured OpenLR is decoded and its points are marked for the selected record. OpenLR
+  carries no road shape between its points (a decoder finds the shortest path in its own map,
+  OpenLR white paper v1.5 §5.1), and this viewer does not map-match it, so a record whose only line
+  is OpenLR is drawn as a straight line through its points, trimmed by its offsets. FRCs are not
+  mapped to OSM road classes, because publishers define them against different map data. Binary
+  OpenLR is not decoded. Only `gmlLineString` counts as a polyline for the RTTI indicators (besides
+  OpenLR, as before).
   The `posList` axis order is "lat lon" per EPSG:4326. "lon lat" files are detected from explicit
   latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds. They

@@ -353,3 +353,46 @@ describe('matching preferences', async () => {
     expect(m2.ranked[0]!.candidate.tags).toEqual({ highway: 'primary', lanes: '2' })
   })
 })
+
+describe('LinearElementByPoints and OpenLR geometry', async () => {
+  const { V2_BYPOINTS } = await import('./fixtures')
+  const r = await run(V2_BYPOINTS)
+  const ev = (id: string) => r.events.find((e) => e.id === id)!
+  const coords = (id: string) => (ev(id).geometry as { coordinates: number[][] }).coordinates
+
+  it('draws the points of a LinearElementByPoints as a line cut to fromPoint/toPoint, before OpenLR', () => {
+    const e = ev('BP-1-R')
+    expect(e.geometry?.type).toBe('LineString')
+    expect(e.geometrySource).toBe('linearElementByPoints')
+    expect(e.geometryConfidence).toBe('direct')
+    const c = coords('BP-1-R')
+    // Intermediate points sorted by index despite document order; cut 150 m from the start.
+    expect(c.slice(0, 2)).toEqual([[9.5, 52.01], [9.5, 52.0091]])
+    expect(c).toHaveLength(3)
+    expect(c[2]![1]).toBeCloseTo(52.01 - 0.0009 * 1.5, 5)
+    expect(e.geometryNote).toMatch(/Cut to 0 m–150 m of 400 m/)
+  })
+
+  it('draws the whole element without fromPoint/toPoint', () => {
+    expect(coords('BP-2-R')).toHaveLength(5)
+    expect(ev('BP-2-R').warnings).toEqual([])
+  })
+
+  it('reads percentage and referent distances and reverses when toPoint precedes fromPoint', () => {
+    // fromPoint 50 % = 200 m; toPoint 50 m from M1 (100 m) towards S = 50 m.
+    const c = coords('BP-3-R')
+    expect(ev('BP-3-R').geometryNote).toMatch(/reversed/)
+    expect(c[0]![1]).toBeCloseTo(52.0082, 5)
+    expect(c[c.length - 1]![1]).toBeCloseTo(52.01 - 0.00045, 5)
+  })
+
+  it('falls back to a straight OpenLR line trimmed in proportion to its offsets', () => {
+    const e = ev('BP-4-R')
+    expect(e.geometrySource).toBe('openlr')
+    expect(e.geometryConfidence).toBe('approximate')
+    // Path 800 m, chord ~400 m: 200 m offsets trim a quarter of the chord at each end.
+    const c = coords('BP-4-R')
+    expect(c[0]![1]).toBeCloseTo(52.01 - 0.0009, 5)
+    expect(c[1]![1]).toBeCloseTo(52.0064 + 0.0009, 5)
+  })
+})

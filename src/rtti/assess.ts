@@ -96,6 +96,9 @@ function polylineOf(e: RoadEvent): { line?: LonLat[]; defects: string[]; zeroLen
   const defects: string[] = []
   let best: LonLat[] | undefined
   let zeroLength: LonLat | undefined
+  // Only a gmlLineString is a polyline here; lines built from a LinearElementByPoints or OpenLR
+  // are drawn but judged by their own rules (OpenLR below).
+  if (e.geometrySource !== undefined && e.geometrySource !== 'gmlLineString') return { defects }
   for (const raw of linesOf(e.geometry)) {
     const line: LonLat[] = []
     let dup = 0

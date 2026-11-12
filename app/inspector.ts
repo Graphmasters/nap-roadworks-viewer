@@ -291,6 +291,7 @@ function openlrBlock(r: OpenlrReference): HTMLElement {
     h('p', null, describeOpenlr(r)),
     dl([
       ['Point type', r.pointType],
+      ['Road class', roadClassText(r)],
       ['Offsets', r.positiveOffset !== undefined || r.negativeOffset !== undefined ? `+${r.positiveOffset ?? 0} m / −${r.negativeOffset ?? 0} m` : undefined],
       ['Orientation', r.orientation],
       ['Side of road', r.sideOfRoad],
@@ -320,8 +321,43 @@ function openlrBlock(r: OpenlrReference): HTMLElement {
     })
     wrap.append(h('div', { class: 'table-scroll' }, h('table', { class: 'lrp' }, h('thead', null, head), body)))
     wrap.append(h('p', { class: 'muted' }, 'On the map: first LRP green, last red, dashed line in LRP order; chevrons along the record polyline show its vertex order.'))
+    if (r.lrps.some((p) => p.frc || p.lfrcnp)) wrap.append(osmRoadClassReference())
   }
   return wrap
+}
+
+/** FRC values of the LRPs as published (FRC, then LFRCNP towards the next LRP), without interpretation. */
+function roadClassText(r: OpenlrReference): string | undefined {
+  const frc = [...new Set(r.lrps.map((p) => p.frc).filter(Boolean))]
+  const lfrcnp = [...new Set(r.lrps.map((p) => p.lfrcnp).filter(Boolean))]
+  if (!frc.length && !lfrcnp.length) return undefined
+  return [
+    frc.length ? frc.join(', ') : '',
+    lfrcnp.length ? `lowest FRC to next point ${lfrcnp.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ') + ' (as published; what each FRC covers depends on the publisher\'s map data)'
+}
+
+/** OSM road class hierarchy for comparison. Deliberately not mapped to FRC: publishers define FRCs differently. */
+const OSM_ROAD_CLASSES: Array<[string, string]> = [
+  ['1', 'motorway'],
+  ['2', 'trunk, primary'],
+  ['3', 'secondary'],
+  ['4', 'tertiary'],
+  ['5', 'public roads: residential, unclassified'],
+  ['6', 'living_street'],
+  ['7', 'everything else'],
+]
+
+function osmRoadClassReference(): HTMLElement {
+  return h(
+    'details',
+    null,
+    h('summary', null, 'OSM road class hierarchy (for comparison)'),
+    h('p', { class: 'muted' }, 'OpenLR FRC0–FRC7 follow the road classes of the map the publisher encoded against, and those definitions differ between map vendors and tools. The FRCs above are reported as published and not mapped to these OSM classes.'),
+    h('ol', { class: 'compact' }, ...OSM_ROAD_CLASSES.map(([, label]) => h('li', null, h('code', null, label)))),
+  )
 }
 
 function laneImpactText(e: RoadEvent): string {

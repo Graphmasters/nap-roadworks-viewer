@@ -8,6 +8,13 @@ export type DatexVersion = '2' | '3' | 'unknown'
 /** How a geometry was obtained (concept §5.2). */
 export type GeometryConfidence = 'direct' | 'decoded' | 'approximate' | 'matched' | 'none'
 
+/**
+ * Where a record's drawn geometry comes from, in order of preference: a gmlLineString, the points
+ * of a LinearElementByPoints, a straight line through structured OpenLR location reference points,
+ * loose point coordinates.
+ */
+export type GeometrySource = 'gmlLineString' | 'linearElementByPoints' | 'openlr' | 'points'
+
 export type RestrictionType = 'fullClosure' | 'partialClosure' | 'roadworks' | 'unknown'
 
 /** What the restriction type was derived from. */
@@ -159,6 +166,8 @@ export interface RoadEvent {
   geometryConfidence: GeometryConfidence
   /** Explanation of where the geometry came from or why there is none. */
   geometryNote?: string
+  /** Location element the drawn geometry was built from. */
+  geometrySource?: GeometrySource
   /** Location referencing methods present in the record (gmlLineString, alertC, openlr, …). */
   locationMethods: string[]
   roadNumber?: string
