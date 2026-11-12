@@ -1,4 +1,4 @@
-// Small lane-status-viewer icons for the lane categories (filter chips, Situation tab).
+// Small lane-status-viewer icons for the lane categories (filter chips, Situation section of the Record tab).
 
 import { renderLaneStatusElement } from 'lane-status-viewer'
 import { LANE_CATEGORIES, type LaneCategory, type LaneCategorySpec } from '../src/index'

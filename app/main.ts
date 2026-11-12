@@ -168,7 +168,7 @@ function renderReportPanel() {
       const id = f.recordIds?.[0]
       const i = id !== undefined ? idIndex.get(id) : result?.events.findIndex((e) => e.situationId === f.situationId)
       if (i !== undefined && i >= 0) {
-        state.tab = f.layer === 'passability' ? 'situation' : f.layer === 'lanes' ? 'lanes' : f.layer === 'rtti' ? 'qa' : 'record'
+        state.tab = f.layer === 'lanes' ? 'lanes' : f.layer === 'rtti' ? 'qa' : 'record'
         select(i, true)
       }
     },
