@@ -6,7 +6,7 @@ profile checks, a map, OpenStreetMap road lookup, lane comparison and passabilit
 **Demo:** <https://graphmasters.github.io/nap-roadworks-viewer/>. Open or drop a DATEX II XML file,
 plain or gzip-compressed. The file is processed in your browser and is not uploaded.
 
-![NAP Roadworks Viewer with Schleswig-Holstein roadworks: the record list on the left, a K 49 cycle-path record on Fehmarn on the map, and the Lanes tab comparing its DATEX II lane status with the OSM lane layout and way direction](docs/screenshot.webp)
+![NAP Roadworks Viewer with Schleswig-Holstein roadworks: the record list on the left, a K 11 roadworks record on the Alte Lübecker Chaussee on the map, and the Lanes tab comparing its DATEX II lane status (closed lane, cycle and foot paths closed, reversible lane) with the OSM lane layout and way direction](docs/screenshot.webp)
 
 *Cycle-path works on the K 49 near Puttgarden (Fehmarn). Lanes tab: the DATEX II lane status
 (`Fu2o`: cycle path closed, both lanes open) next to the usual OSM layout of the matched way, with a
