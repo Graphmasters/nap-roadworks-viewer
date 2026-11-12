@@ -1,5 +1,5 @@
-// Right panel: context-sensitive inspector with tabs for the record, its XML, lanes, the
-// situation (passability), the selected OSM way and matching.
+// Right panel: context-sensitive inspector with tabs for the record (with its situation and
+// passability), its XML, lanes, the selected OSM way and matching.
 
 import { interpretLanes, renderCompassElement, renderDestinationSignElement, renderLanesElement, wayBearing, wikiUrlForKey, type OsmWay } from 'osm-lanes'
 import { getLaneStatusLegend, renderLaneStatusElement } from 'lane-status-viewer'
@@ -29,7 +29,7 @@ import { stars } from './rtti'
 import { PASS_LABEL, TYPE_LABEL } from './records'
 import { laneCategoryIcon } from './lane-icons'
 
-export type Tab = 'record' | 'qa' | 'xml' | 'lanes' | 'situation' | 'osm' | 'match'
+export type Tab = 'record' | 'qa' | 'xml' | 'lanes' | 'osm' | 'match'
 
 export type Loadable<T> = { status: 'idle' } | { status: 'loading'; note?: string } | { status: 'done'; value: T } | { status: 'error'; message: string }
 
@@ -100,7 +100,6 @@ const TABS: Array<[Tab, string]> = [
   ['qa', 'QA'],
   ['xml', 'XML'],
   ['lanes', 'Lanes'],
-  ['situation', 'Situation'],
   ['match', 'Matching'],
   ['osm', 'OSM'],
 ]
@@ -126,11 +125,13 @@ export function renderInspector(el: HTMLElement, s: InspectorState, cb: Inspecto
     append(body, h('p', { class: 'muted' }, 'Select a record in the list or on the map.'))
     return
   }
-  if (s.tab === 'record') renderRecord(body, s.result, e)
+  if (s.tab === 'record') {
+    renderRecord(body, s.result, e)
+    renderSituation(body, s.result, e, cb)
+  }
   else if (s.tab === 'qa') renderQa(body, s.result, e)
   else if (s.tab === 'xml') renderXml(body, s, cb)
   else if (s.tab === 'lanes') renderLanes(body, s, e)
-  else if (s.tab === 'situation') renderSituation(body, s.result, e, cb)
   else if (s.tab === 'match') renderMatch(body, s, e, cb)
 }
 
@@ -407,7 +408,10 @@ function renderLanes(el: HTMLElement, s: InspectorState, e: RoadEvent) {
   )
 }
 
-function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: InspectorCallbacks) {
+/** Situation section at the bottom of the Record tab: linked records and passability conflicts. */
+function renderSituation(parent: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: InspectorCallbacks) {
+  const el = h('section', { class: 'situation-section' })
+  append(parent, el)
   const sit = r.situations.find((x) => x.id === e.situationId)
   const recs = r.events.filter((x) => x.situationId === e.situationId)
   const all = r.passability.filter((p) => p.situationId === e.situationId)
@@ -415,7 +419,7 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
   const dq = [...all.filter((p) => p.recordIds.includes(e.id)), ...all.filter((p) => !p.recordIds.includes(e.id))]
   append(
     el,
-    h('h2', null, `Situation ${e.situationId}`),
+    h('h3', null, 'Situation ', h('code', null, e.situationId)),
     h('p', null, sit?.severity ? `Severity ${sit.severity} · ` : '', `${recs.length} record(s)`, all.length ? [' · ', badge(`${all.length} conflict(s)`, 'pass-conflicting')] : ''),
   )
   // Records linked to the selected one: its causes and the records that name it as cause.
@@ -438,7 +442,7 @@ function renderSituation(el: HTMLElement, r: AnalysisResult, e: RoadEvent, cb: I
       x.causeRecordIds.length ? h('div', { class: 'muted' }, `└ cause record → ${x.causeRecordIds.join(', ')}`) : null,
     )
   }
-  append(el, h('h3', null, 'Selected record and linked records'), h('ul', { class: 'records-tree' }, ...recs.filter((x) => linked.has(x.id)).map(row)))
+  append(el, h('h4', null, 'Selected record and linked records'), h('ul', { class: 'records-tree' }, ...recs.filter((x) => linked.has(x.id)).map(row)))
   const dqBlock = (f: (typeof all)[number]) =>
     h(
       'div',
