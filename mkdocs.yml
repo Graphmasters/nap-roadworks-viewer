@@ -1,0 +1,70 @@
+# Documentation site, published at https://graphmasters.github.io/nap-roadworks-viewer/docs/.
+# The app occupies the root of the same GitHub Pages site, so the docs build into _site/docs/
+# after `npm run build:app` (Vite empties _site/ first). Preview: `mkdocs serve`.
+site_name: NAP Roadworks Viewer
+site_description: >-
+  Documentation of NAP Roadworks Viewer, an open-source browser tool that checks DATEX II roadworks
+  and road-closure feeds from National Access Points and links them to OpenStreetMap, lane by lane.
+site_url: https://graphmasters.github.io/nap-roadworks-viewer/docs/
+site_author: Graphmasters GmbH
+repo_url: https://github.com/Graphmasters/nap-roadworks-viewer
+repo_name: Graphmasters/nap-roadworks-viewer
+edit_uri: edit/main/docs/
+copyright: >-
+  © Graphmasters GmbH · Apache License 2.0 ·
+  <a href="https://www.graphmasters.net/imprint">Impressum</a>
+
+docs_dir: docs
+site_dir: _site/docs
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Getting a DATEX II file: get-data.md
+      - Using the viewer: usage.md
+      - XML examples: examples.md
+  - What the viewer checks:
+      - Checks: checks.md
+      - Matching and lanes: matching-lanes.md
+      - Passability and contradictions: passability.md
+      - RTTI 5-Star ceilings: rtti.md
+  - About:
+      - Privacy: privacy.md
+      - Limitations: limitations.md
+      - Library and development: development.md
+      - Publications: publications.md
+      - References: references.md
+
+theme:
+  # The built-in readthedocs theme. It ships its CSS, fonts and scripts with the site.
+  name: readthedocs
+  locale: en
+  navigation_depth: 3
+  collapse_navigation: false
+  # Code is highlighted at build time with Pygments (pymdownx.highlight), styled by
+  # docs/css/pygments.css. highlight.js would come from cdnjs, so it stays off.
+  highlightjs: false
+
+extra_css:
+  - css/pygments.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.superfences
+
+validation:
+  links:
+    absolute_links: warn
+    unrecognized_links: warn
+    anchors: warn

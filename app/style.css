@@ -162,6 +162,10 @@ button.linkish {
   margin-left: auto;
 }
 
+.gh + .gh {
+  margin-left: 0;
+}
+
 /* ---------------------------------------------------------------- layout */
 .layout {
   flex: 1;

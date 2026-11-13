@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic DATEX II v3 example: three roadworks records located in three ways — a
+     gmlLineString, a LinearElementByPoints cut to fromPoint/toPoint, and an OpenLR line.
+     Ids, places and values are invented. Valid against the DATEX II v3.5 schemas. -->
+<d2:payload xmlns:d2="http://datex2.eu/schema/3/d2Payload"
+    xmlns:com="http://datex2.eu/schema/3/common"
+    xmlns:sit="http://datex2.eu/schema/3/situation"
+    xmlns:loc="http://datex2.eu/schema/3/locationReferencing"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:type="sit:SituationPublication" lang="en" modelBaseVersion="3">
+  <com:publicationTime>2026-06-01T08:00:00Z</com:publicationTime>
+  <com:publicationCreator>
+    <com:country>de</com:country>
+    <com:nationalIdentifier>EXAMPLE</com:nationalIdentifier>
+  </com:publicationCreator>
+  <sit:situation id="EX-4">
+    <sit:headerInformation>
+      <com:confidentiality>noRestriction</com:confidentiality>
+      <com:informationStatus>real</com:informationStatus>
+    </sit:headerInformation>
+    <sit:situationRecord xsi:type="sit:MaintenanceWorks" id="EX-4-GML" version="1">
+      <sit:situationRecordCreationTime>2026-05-01T06:00:00Z</sit:situationRecordCreationTime>
+      <sit:situationRecordVersionTime>2026-05-01T06:00:00Z</sit:situationRecordVersionTime>
+      <sit:probabilityOfOccurrence>certain</sit:probabilityOfOccurrence>
+      <sit:validity>
+        <com:validityStatus>definedByValidityTimeSpec</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2026-06-08T05:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2026-06-26T15:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:LinearLocation">
+        <loc:gmlLineString srsName="EPSG:4326">
+          <loc:posList>52.03000 9.56000 52.03100 9.56200 52.03200 9.56400</loc:posList>
+        </loc:gmlLineString>
+      </sit:locationReference>
+      <sit:roadMaintenanceType>roadworks</sit:roadMaintenanceType>
+    </sit:situationRecord>
+    <sit:situationRecord xsi:type="sit:MaintenanceWorks" id="EX-4-POINTS" version="1">
+      <sit:situationRecordCreationTime>2026-05-01T06:00:00Z</sit:situationRecordCreationTime>
+      <sit:situationRecordVersionTime>2026-05-01T06:00:00Z</sit:situationRecordVersionTime>
+      <sit:probabilityOfOccurrence>certain</sit:probabilityOfOccurrence>
+      <sit:validity>
+        <com:validityStatus>definedByValidityTimeSpec</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2026-06-08T05:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2026-06-26T15:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:linearWithinLinearElement>
+          <loc:linearElement xsi:type="loc:LinearElementByPoints">
+            <loc:startPointOfLinearElement>
+              <loc:referentIdentifier>START</loc:referentIdentifier>
+              <loc:referentType>referenceMarker</loc:referentType>
+              <loc:pointCoordinates>
+                <loc:latitude>52.04000</loc:latitude>
+                <loc:longitude>9.58000</loc:longitude>
+              </loc:pointCoordinates>
+            </loc:startPointOfLinearElement>
+            <loc:intermediatePointOnLinearElement index="1">
+              <loc:referent>
+                <loc:referentIdentifier>MID</loc:referentIdentifier>
+                <loc:referentType>referenceMarker</loc:referentType>
+                <loc:pointCoordinates>
+                  <loc:latitude>52.04000</loc:latitude>
+                  <loc:longitude>9.58300</loc:longitude>
+                </loc:pointCoordinates>
+              </loc:referent>
+            </loc:intermediatePointOnLinearElement>
+            <loc:endPointOfLinearElement>
+              <loc:referentIdentifier>END</loc:referentIdentifier>
+              <loc:referentType>referenceMarker</loc:referentType>
+              <loc:pointCoordinates>
+                <loc:latitude>52.04000</loc:latitude>
+                <loc:longitude>9.58600</loc:longitude>
+              </loc:pointCoordinates>
+            </loc:endPointOfLinearElement>
+          </loc:linearElement>
+          <loc:fromPoint xsi:type="loc:DistanceFromLinearElementStart">
+            <loc:distanceAlong>50</loc:distanceAlong>
+          </loc:fromPoint>
+          <loc:toPoint xsi:type="loc:DistanceFromLinearElementStart">
+            <loc:distanceAlong>350</loc:distanceAlong>
+          </loc:toPoint>
+        </loc:linearWithinLinearElement>
+      </sit:locationReference>
+      <sit:roadMaintenanceType>roadworks</sit:roadMaintenanceType>
+    </sit:situationRecord>
+    <sit:situationRecord xsi:type="sit:MaintenanceWorks" id="EX-4-OPENLR" version="1">
+      <sit:situationRecordCreationTime>2026-05-01T06:00:00Z</sit:situationRecordCreationTime>
+      <sit:situationRecordVersionTime>2026-05-01T06:00:00Z</sit:situationRecordVersionTime>
+      <sit:probabilityOfOccurrence>certain</sit:probabilityOfOccurrence>
+      <sit:validity>
+        <com:validityStatus>definedByValidityTimeSpec</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2026-06-08T05:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2026-06-26T15:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:openlrLinear>
+          <loc:firstDirection>
+            <loc:openlrLocationReferencePoint>
+              <loc:openlrCoordinates>
+                <loc:latitude>52.05000</loc:latitude>
+                <loc:longitude>9.60000</loc:longitude>
+              </loc:openlrCoordinates>
+              <loc:openlrLineAttributes>
+                <loc:openlrFunctionalRoadClass>frc3</loc:openlrFunctionalRoadClass>
+                <loc:openlrFormOfWay>singleCarriageway</loc:openlrFormOfWay>
+                <loc:openlrBearing>90</loc:openlrBearing>
+              </loc:openlrLineAttributes>
+              <loc:openlrPathAttributes>
+                <loc:openlrLowestFrcToNextLRPoint>frc3</loc:openlrLowestFrcToNextLRPoint>
+                <loc:openlrDistanceToNextLRPoint>720</loc:openlrDistanceToNextLRPoint>
+              </loc:openlrPathAttributes>
+            </loc:openlrLocationReferencePoint>
+            <loc:openlrLastLocationReferencePoint>
+              <loc:openlrCoordinates>
+                <loc:latitude>52.05000</loc:latitude>
+                <loc:longitude>9.61050</loc:longitude>
+              </loc:openlrCoordinates>
+              <loc:openlrLineAttributes>
+                <loc:openlrFunctionalRoadClass>frc3</loc:openlrFunctionalRoadClass>
+                <loc:openlrFormOfWay>singleCarriageway</loc:openlrFormOfWay>
+                <loc:openlrBearing>270</loc:openlrBearing>
+              </loc:openlrLineAttributes>
+            </loc:openlrLastLocationReferencePoint>
+            <loc:openlrOffsets>
+              <loc:openlrPositiveOffset>60</loc:openlrPositiveOffset>
+              <loc:openlrNegativeOffset>60</loc:openlrNegativeOffset>
+            </loc:openlrOffsets>
+          </loc:firstDirection>
+        </loc:openlrLinear>
+      </sit:locationReference>
+      <sit:roadMaintenanceType>roadworks</sit:roadMaintenanceType>
+    </sit:situationRecord>
+  </sit:situation>
+</d2:payload>
