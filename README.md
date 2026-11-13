@@ -20,11 +20,9 @@ compare them with OpenStreetMap.
   Thanks to all of them! These requests carry tile coordinates, OSM way ids or small bounding boxes,
   so they show roughly where your records are (see [Privacy](#privacy)).
 
-> [!NOTE]
-> **Demo:** <https://graphmasters.github.io/nap-roadworks-viewer/>
-
-> [!NOTE]
-> **Documentation:** <https://graphmasters.github.io/nap-roadworks-viewer/docs/>
+> [!TIP]
+> - **Demo:** <https://graphmasters.github.io/nap-roadworks-viewer/>
+> - **Documentation:** <https://graphmasters.github.io/nap-roadworks-viewer/docs/>
 
 ![NAP Roadworks Viewer with Schleswig-Holstein roadworks: the record list on the left, a K 11 roadworks record on the Alte Lübecker Chaussee on the map, and the Lanes tab comparing its DATEX II lane status (closed lane, cycle and foot paths closed, reversible lane) with the OSM lane layout and way direction](docs/screenshot.webp)
 
