@@ -20,7 +20,7 @@ server, they see your IP address.
 | OpenFreeMap | `tiles.openfreemap.org` | Map tiles. The map moves to your records and matching reads z14 tiles along a record, so these requests show roughly where your records are. |
 | BKG basemap.de | `sgx.geodatenzentrum.de` | Fonts and map icons of the basemap.world style. |
 | OpenStreetMap API | `api.openstreetmap.org` | When you select a road, use a matching candidate or run matching (which starts by itself when you select a record with a line): a way id or a small bounding box; during matching that box comes from the record. |
-| Overpass | `overpass-api.de` (FOSSGIS e.V.), `overpass.private.coffee` | During matching, for larger areas: a road class and the bounding box of the matched part of the record. |
+| Overpass | `overpass-api.de` (FOSSGIS e.V.), `overpass.private.coffee` | During matching, to split a merged map feature into its OSM ways: first choice for larger areas, fallback after the OSM API for small ones ([details](matching-lanes.md#merged-tile-features)). A road class and the bounding box of the matched part of the record. |
 
 No other data from your file is sent. The same list is in the viewer's **Privacy** dialog, linked from
 the map credits.

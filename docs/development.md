@@ -3,17 +3,26 @@
 ## Library
 
 The analysis runs without the UI, in the browser or in Node.js ≥ 20, so the same checks can run in a
-pipeline.
+pipeline. It is not published on npm yet, so build a package from source (building needs a newer
+Node.js, see [Development](#development)):
 
 ```sh
-npm install @graphmasters/nap-roadworks-viewer   # not yet published; build from source meanwhile
+git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
+cd nap-roadworks-viewer
+npm ci
+npm run build    # library → dist/
+npm pack         # → graphmasters-nap-roadworks-viewer-<version>.tgz
 ```
+
+Install the archive in your project with
+`npm install /path/to/graphmasters-nap-roadworks-viewer-<version>.tgz`, using the file name that
+`npm pack` prints. Then:
 
 ```ts
 import { openAsBlob } from 'node:fs'
 import { analyseDatex } from '@graphmasters/nap-roadworks-viewer'
 
-const blob = await openAsBlob('feed.xml.gz')
+const blob = await openAsBlob('feed.xml.gz')     // plain or gzip
 const result = await analyseDatex({ size: blob.size, stream: () => blob.stream() })
 
 result.wellFormed                 // { ok: true } or the first error with line/column
@@ -23,12 +32,20 @@ result.events                     // normalised records (GeoJSON geometry with g
 result.findings                   // findings with rule id, severity, layer, xmlPath
 result.recordPassability          // per record: classification, routing action, reasons
 result.passability                // DQ-RW-001 / DQ-RW-002 findings with evidence and assumptions
+result.rtti                       // RTTI 5-Star ceilings per use case and criterion
 ```
 
-Other exports: `runChecks` (re-run with another profile), `extractText` (original XML of a record by
-character offsets), `summariseLaneCode`, `compareLanes`, `osmLaneAttributes` and `matchEvent`.
+Other exports include `runChecks` (re-run with another profile), `extractText` (original XML of a
+record by character offsets), `summariseLaneCode`, `compareLanes`, `osmLaneAttributes`,
+`decodeOpenlr`, `assessRtti` and `matchEvent`. See
+[`src/index.ts`](https://github.com/Graphmasters/nap-roadworks-viewer/blob/main/src/index.ts) for the
+full list.
 
 ## Development
+
+Building and testing need Node.js 22.18 or later in the 22 line, 24.11 or later in the 24 line, or
+26 or later, as the build tool tsup does. `devEngines` in `package.json` states this range, so
+`npm ci` stops on other versions.
 
 ```sh
 git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
