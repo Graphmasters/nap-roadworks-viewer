@@ -63,6 +63,8 @@ export interface PendingGeometry {
   lines: number[][]
   /** LinearElementByPoints polylines, cut to their fromPoint/toPoint (explicit lat/lon). */
   elementLines: LinearElementLine[]
+  /** LinearElementByPoints read from linear locations, including those that could not be drawn. */
+  elementsByPoints?: number
   /** Points with explicit latitude/longitude elements (unambiguous axis order). */
   points: Array<[lat: number, lon: number]>
   /** True when `points` come only from display points (`locationForDisplay`, `coordinatesForDisplay`). */
@@ -390,6 +392,6 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
       if (lat !== undefined && lon !== undefined) points.push([lat, lon])
     }
   }
-  const elementLines = linearElementLines(location, warnings)
-  return { lines, elementLines, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+  const byPoints = linearElementLines(location, warnings)
+  return { lines, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
 }

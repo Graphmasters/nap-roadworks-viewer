@@ -396,3 +396,54 @@ describe('LinearElementByPoints and OpenLR geometry', async () => {
     expect(c[1]![1]).toBeCloseTo(52.0064 + 0.0009, 5)
   })
 })
+
+describe('location findings after the OpenLR and LinearElementByPoints geometry', async () => {
+  const { V2_BYPOINTS, V2_LOCATION_KINDS, V2_OPENLR_POINTS } = await import('./fixtures')
+  const kinds = await run(V2_LOCATION_KINDS)
+  const finding = (r: Awaited<ReturnType<typeof run>>, rule: string, id: string) => r.findings.find((f) => f.ruleId === rule && f.recordIds?.[0] === id)
+  const recordsWith = (r: Awaited<ReturnType<typeof run>>, rule: string) => r.findings.filter((f) => f.ruleId === rule).map((f) => f.recordIds?.[0])
+
+  it('checks OpenLR against the point coordinates, not against the line drawn from the OpenLR (OLR-003/004)', async () => {
+    const r = await run(V2_OPENLR_POINTS)
+    expect(r.events.every((e) => e.geometrySource === 'openlr')).toBe(true)
+    expect(recordsWith(r, 'OLR-003')).toEqual(['OP-SWAP-R'])
+    expect(recordsWith(r, 'OLR-004')).toEqual(['OP-FAR-R'])
+    // Swapped OpenLR does not count as the RTTI polyline.
+    expect(finding(r, 'RTTI-LIN-01', 'OP-SWAP-R')?.explanation).toContain('invalid or swapped')
+    expect(finding(r, 'RTTI-LIN-01', 'OP-OK-R')).toBeUndefined()
+  })
+
+  it('names what an approximate location is drawn from (LOC-002)', async () => {
+    expect(finding(kinds, 'LOC-002', 'K-PT-R')?.message).toBe('Approximate location: point coordinates only.')
+    expect(finding(kinds, 'LOC-002', 'K-ZERO-R')?.message).toBe('Approximate location: zero-length gmlLineString drawn as a point.')
+    const r = await run(V2_BYPOINTS)
+    expect(finding(r, 'LOC-002', 'BP-4-R')?.message).toBe('Approximate location: straight line through OpenLR points.')
+    expect(finding(r, 'LOC-002', 'BP-1-R')).toBeUndefined()
+  })
+
+  it('gives the real reason a decoded location is not drawn (LOC-001)', () => {
+    const why = (id: string) => finding(kinds, 'LOC-001', id)?.explanation ?? ''
+    expect(why('K-OLRPT-R')).toMatch(/OpenLR point location/)
+    expect(why('K-AREA-R')).toMatch(/OpenLR area location/)
+    expect(why('K-PROJ-R')).toMatch(/not valid WGS 84 positions/)
+    expect(why('K-BPPROJ-R')).toMatch(/LinearElementByPoints is decoded but has no start and end point with valid WGS 84 coordinates/)
+    for (const id of ['K-OLRPT-R', 'K-AREA-R', 'K-PROJ-R', 'K-BPPROJ-R']) expect(why(id)).not.toMatch(/does not decode/)
+    // Invalid coordinates are an error in the feed, not a limitation of the viewer.
+    expect(why('K-PROJ-R')).not.toMatch(/limitation of the viewer/)
+    expect(why('K-BPPROJ-R')).not.toMatch(/limitation of the viewer/)
+    expect(why('K-AREA-R')).toMatch(/limitation of the viewer/)
+  })
+
+  it('does not draw a point along a LinearElementByPoints as the whole element', () => {
+    const e = kinds.events.find((x) => x.id === 'K-PAL-R')!
+    expect(e.geometrySource).toBe('points')
+    expect(e.geometry?.type).toBe('MultiPoint')
+    expect(e.geometryConfidence).toBe('approximate')
+  })
+
+  it('says that a line drawn from a LinearElementByPoints does not count for RTTI (RTTI-LIN-01)', async () => {
+    const r = await run(V2_BYPOINTS)
+    expect(finding(r, 'RTTI-LIN-01', 'BP-2-R')?.explanation).toMatch(/line the map draws from the LinearElementByPoints does not count/)
+    expect(finding(r, 'RTTI-LIN-01', 'BP-4-R')).toBeUndefined()
+  })
+})

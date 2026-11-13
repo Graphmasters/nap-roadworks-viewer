@@ -373,20 +373,22 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         })
       if (poly.line && poly.defects.length)
         add('RTTI-LIN-02', 'warning', `Polyline defects: ${poly.defects.join(', ')}.`, e)
+      // The map may draw a line from a LinearElementByPoints, but it is not a polyline here.
+      const byPointsNote = e.geometrySource === 'linearElementByPoints' ? ' The line the map draws from the LinearElementByPoints does not count as a polyline here.' : ''
       // Zero-length lines are drawn as points (applyGeometry); the record keeps the position.
-      const zero = !line && !projected ? (poly.zeroLength ?? (e.zeroLengthLine ? ([e.zeroLengthLine[1], e.zeroLengthLine[0]] as LonLat) : undefined)) : undefined
+      const zero =!line && !projected ? (poly.zeroLength ?? (e.zeroLengthLine ? ([e.zeroLengthLine[1], e.zeroLengthLine[0]] as LonLat) : undefined)) : undefined
       if (zero)
         add('RTTI-LIN-01', 'warning', 'The gmlLineString has zero length: all its positions are the same point.', e, {
           explanation: `Every position in the posList is ${zero[1]} ${zero[0]} (lat lon), so the line has no length and no direction: it is a point written as a line. Linear referencing needs at least two distinct positions along the affected section.${
             olr.excluded ? ` The OpenLR line does not count either, because ${olr.excluded}.` : ''
-          }`,
+          }${byPointsNote}`,
           rawValue: `${zero[1]} ${zero[0]}`,
         })
       else if (!line && !projected)
         add('RTTI-LIN-01', 'warning', 'No polyline: linear referencing (polylines) is required at every star level.', e, {
           explanation: `Location methods: ${e.locationMethods.join(', ') || 'none'}. ${
             olr.excluded ? `The OpenLR line does not count because ${olr.excluded}.` : 'A gmlLineString or a structured OpenLR line counts; ALERT-C, points and binary OpenLR do not.'
-          }`,
+          }${byPointsNote}`,
         })
       if (loc.level === 0)
         add('RTTI-LOC-01', 'warning', 'No location reference that counts for the rating (OpenLR, ALERT-C or coordinates).', e, {
@@ -415,7 +417,7 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
           ? `The gmlLineString has zero length (all positions are ${zero[1]} ${zero[0]}).`
           : olr.excluded
             ? `No gmlLineString, and the OpenLR line does not count because ${olr.excluded}.`
-            : `No gmlLineString or OpenLR line (location methods: ${e.locationMethods.join(', ') || 'none'}).`
+            : `No gmlLineString or OpenLR line (location methods: ${e.locationMethods.join(', ') || 'none'}).${byPointsNote}`
       return { e, line, lineSource, zeroLength: zero, lineNote, projected, locLevel: loc.level, locMethod: loc.method, dir: dir.status, dirHow: dir.how, resolutionM }
     })
 
