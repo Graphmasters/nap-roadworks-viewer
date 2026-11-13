@@ -47,9 +47,9 @@ means and how a router could treat them:
 Findings in the report and the RTTI panel link to the records they concern. The inspector shows a
 record's details, QA findings, original XML, lanes, matching result and OpenStreetMap tags.
 
-The viewer has been tried on feeds from seven publishers in six countries (Germany, the
-Netherlands, Norway, Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in
-DATEX II v2 and v3. A 209 MB feed with 61,000 records works.
+The viewer has been tried on seven feeds from six countries (Germany, the Netherlands, Norway,
+Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v2 and v3. A
+209 MB feed with 61,000 records works.
 
 ## Quick start
 
