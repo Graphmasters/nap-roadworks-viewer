@@ -93,10 +93,12 @@ The main ones are below; the
 documentation has the full list.
 
 - **Location referencing.** Lines are drawn from `gmlLineString` (v2 `linearExtension`, v3
-  `LinearLocation`) in WGS 84 degrees and from `LinearElementByPoints`. OpenLR is not map-matched:
-  a record whose only line is OpenLR is drawn as an *approximate* straight line. Binary OpenLR is
-  detected, not decoded. ALERT-C, TPEG and coded linear-element references are listed, not
-  decoded. See *Location referencing and OpenLR* below. ALERT-C, TPEG and coded linear-element references are listed, not decoded.
+  `LinearLocation`) in WGS 84 degrees and from a `LinearElementByPoints` in a linear location; in a
+  `pointAlongLinearElement` its points are shown as points. OpenLR is not map-matched: a record
+  whose only line is OpenLR is drawn as an *approximate* straight line through its points. That
+  line is chosen before the checks run, so it is drawn even when its points fail `OLR-003` or
+  `OLR-004`. Binary OpenLR is detected, not decoded. ALERT-C, TPEG and coded linear-element
+  references are listed, not decoded.
 - **Axis order.** `posList` is read as "lat lon", as EPSG:4326 defines it. "lon lat" files are
   detected from explicit latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds and
@@ -105,156 +107,30 @@ documentation has the full list.
   (update cycle, timeliness, secure API, ID stability) are not shown, and there is no overall star
   value. TISA's evaluation methodology is not published yet.
 - **Matching ranks candidates.** The score orders OpenStreetMap candidates; it is not a calibrated
-  probability. OSM lane tags describe the usual layout and DATEX II a temporary one, so a
-  difference is a hint, not an error. Direction mapping between DATEX II and OSM is not verified.
+  probability. Matching runs on the line the map draws. A straight OpenLR line cuts corners, so
+  scores drop and the right road can be missed, and the Matching tab does not warn about it; the
+  same-section test of `DQ-RW-001` is less reliable for such lines too.
+- **Lanes.** OSM lane tags describe the usual layout and DATEX II a temporary one, so a difference
+  is a hint, not an error. Direction mapping between DATEX II and OSM is not verified.
 - **Memory.** Files are streamed, but the 209 MB feed (16 MB gzipped) with 61,000 records needs
   several hundred MB of memory. XSD validation loads the whole document (at most 400 MB).
 
 ## How the checks work
 
-The documentation explains each step with examples:
-[Checks](https://graphmasters.github.io/nap-roadworks-viewer/docs/checks/),
-[Matching and lanes](https://graphmasters.github.io/nap-roadworks-viewer/docs/matching-lanes/),
-[Passability and contradictions](https://graphmasters.github.io/nap-roadworks-viewer/docs/passability/)
-and [RTTI 5-Star ceilings](https://graphmasters.github.io/nap-roadworks-viewer/docs/rtti/). The
-sections below summarise them and are collapsed to keep this page short.
+The documentation describes each step in detail, with tested XML examples:
 
-<details>
-<summary><strong>Feature reference</strong></summary>
-
-| Step | What you get |
-|---|---|
-| **XML** | Streaming well-formedness check (line and column of the first error). DTDs and external entities are never resolved. |
-| **DATEX II detection** | Version (v2 / v3), `modelBaseVersion`, publication type, publication time and creator, SOAP envelope. |
-| **XSD validation** | Real schema validation with libxml2 (WebAssembly) against XSD files you select. The UI says "not performed" until you do. |
-| **Profile checks** | Profile detection (MDM roadworks profile 04-00-00, NDW situation feeds, generic v2/v3) with heuristic rules, labelled as heuristics. |
-| **Extensions** | Official extension mechanisms (v2 `…Extension`, v3 `_…Extension`) apart from other namespaces, with element counts. |
-| **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. Feeds with lane status codes get a lane-configuration filter (reversible lane, hard shoulder open/closed, narrowed or closed lane, parking lane and restrictions, cycleway and pedestrian path open/closed) with lane-status-viewer icons, which also mark records in the Situation section of the Record tab. |
-| **Record list** | Filters by record type (with counts), passability, location (on the map, not drawable, OpenLR present) and "active now", plus a free-text search over id, situation id, road number and name, description, record type and management types. Only visible rows are rendered, so feeds with 60,000+ records stay fast. ↑/↓ moves through the list, Esc clears the selection. |
-| **Inspector** | Tabs Record, QA, XML (original XML of the record or its situation), Lanes, Matching and OSM (tags linked to the OSM wiki). Findings in the report and the RTTI panel jump to the record and open the right tab. |
-| **Interface** | Map clicks select a record or an OSM road. The map position is kept in the URL (`#map=…`); nothing about the file is. Dark mode follows the system setting, motion is reduced on request, and below 900 px the layout switches between Feed, Map and Inspector. A progress bar shows bytes, situations and records while a file loads. The map credits link to the Impressum and to a Privacy dialog that lists every service the browser contacts. |
-| **Map** | Lines, in order of preference: `gmlLineString`; the points of a `LinearElementByPoints` in a linear location (`linearWithinLinearElement`), cut to its `fromPoint`/`toPoint`; a straight line through structured OpenLR location reference points (*approximate*). Point-only records as points marked *approximate*; other location methods listed with a reason. The inspector reports OpenLR road classes (FRC, LFRCNP) as published, next to the OSM road class hierarchy for comparison. |
-| **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
-| **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
-| **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
-| **Passability** | Per record: passable, restricted, closed, conditional, conflicting or unknown, plus the routing action (block, do not block, manual review). |
-| **OpenLR** | Whether the feed carries OpenLR, per record and in total. Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2 `openlrExtendedLinear` / `openlrExtendedPoint`) is decoded: location reference points with coordinates, FRC, form of way, bearing, LFRCNP, DNP, offsets. Its coordinates are checked as WGS 84 decimal degrees and against the record's own `gmlLineString`, `LinearElementByPoints` line or point coordinates, never against the line drawn through the OpenLR points (`OLR-001`…`OLR-006`). The inspector lists the points; the map marks them for the selected record. Binary OpenLR is detected, not decoded. |
-| **RTTI 5-Star** | Star-level ceilings per criterion of the [TISA RTTI 5-Star Rating Specification](https://tisa.org/rtti-5-star-rating-specification/) for planned and unplanned roadworks and road closures (see below). |
-
-</details>
-
-<details>
-<summary><strong>Location referencing and OpenLR</strong></summary>
-
-A `LinearElementByPoints` in a linear location (`linearWithinLinearElement`) is cut to its
-`fromPoint`/`toPoint`, with distances measured along its points. In a `pointAlongLinearElement` the
-point along the element is not computed, so its points are shown as points.
-
-Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2
-`openlrExtendedLinear` / `openlrExtendedPoint`) is decoded and its points are marked for the
-selected record. OpenLR carries no road shape between its points (a decoder finds the shortest path
-in its own map, OpenLR white paper v1.5 §5.1), and this viewer does not map-match it, so a record
-whose only line is OpenLR is drawn as a straight line through its points, trimmed by its offsets.
-FRCs are not mapped to OSM road classes, because publishers define them against different map data.
-
-For the RTTI indicators, only `gmlLineString` and structured OpenLR count as polylines.
-
-</details>
-
-<details>
-<summary><strong>Matching against OpenStreetMap</strong></summary>
-
-**OSM ids from tiles.** OpenFreeMap tiles are built with planetiler, which encodes
-`osmId × 10 + type`. Features merged from several ways (suffix 0) are common even at zoom 14, and
-their id names only the first way. For those the viewer looks up the clicked way by location with a
-~25 m bounding-box query to the OSM API.
-
-**Scoring.** Matching samples the record line and scores candidates read straight from the z14
-vector tiles along the record (up to 150 tiles; the visible map does not move). z14 is the highest
-zoom of OpenFreeMap, so these are the geometries the map shows. Score = coverage × quality: the
-quality of the covered part (distance 0.3, direction 0.45, road number 0.15, class 0.1) multiplied
-by the share of the record within 25 m. Ways join the explaining sequence on quality (≥ 0.6), so
-several ways can share a long record. A merged tile feature ranks 0.1 lower than its score, so a
-single OSM way within that margin wins; a runner-up on the same road (within 3 m) does not make the
-match ambiguous.
-
-**Splitting merged features.** When the best candidate is a merged tile feature, the viewer asks
-for the ways with the same `highway` value (from the tile's road class) inside the part of the
-record that feature covers, and scores them in its place (up to 3 rounds). Boxes up to
-500 × 500 m are asked from the OSM API first, then from Overpass. Larger boxes go to
-`overpass-api.de` first, then, up to 0.0005 square degrees, to the OSM API, then to
-`overpass.private.coffee`. If all fail, the merged feature is kept and marked as such.
-
-</details>
-
-<details>
-<summary><strong>Closures that contradict their cause (DQ-RW-001)</strong></summary>
-
-A record that claims a full closure (`roadClosed`, `carriagewayClosures`) whose linked cause record
-describes only a stopping/parking prohibition (MDM lane codes `H` / `P`, no closed lane) is flagged
-as **DQ-RW-001 – possible incorrect road closure**. The checks are:
-
-1. Resolve `managedCause` links inside the situation. Missing (`REF-001`) and cyclic (`REF-002`)
-   references are reported separately.
-2. Read the lane evidence of the closure, or of its cause when the closure has none. When
-   `laneStatusCoded` and `extendedLaneStatusCoded` disagree, the more restrictive reading wins.
-   Unknown codes never count as open lanes.
-3. Skip the finding when the validity periods do not overlap.
-4. If other records in the situation report a closure for the *same section* (lines overlap within
-   30 m) at an overlapping time, say so: the case needs review rather than correction.
-
-The finding never claims the road is passable. It recommends manual review and not blocking the
-road in routing on this record alone. `DQ-RW-002` covers a closure whose lane status keeps lanes in
-both directions open.
-
-</details>
-
-<details>
-<summary><strong>RTTI 5-Star indicators</strong></summary>
-
-The [TISA RTTI 5-Star Rating Specification v1.0](https://tisa.org/rtti-5-star-rating-specification/)
-(21 October 2025) rates roadworks and road-closure data per criterion from 1★ to 5★ (Tables 15–18).
-The viewer sorts each situation into one of the four use cases and shows, per criterion, the
-**highest level this file allows**: a ceiling, not a rating. The feed cannot score higher on that
-criterion, but it may score lower once the criteria a file cannot show are measured; those are not
-shown for an uploaded file. TISA's Evaluation Methodology is not published yet. The viewer shows no
-overall star value.
-
-| Criterion | Checked in the file | Ceiling |
-|---|---|---|
-| Data format used | DATEX II version; reference-profile conformance (heuristic, plus your XSD run) | v2 3★, v3 4★, v3 conformant 5★ |
-| Use of specification | Record types and value lists of the [DATEX II RTTI reference profile](https://docs.datex2.eu/recommended-profiles/rrp/rtti/); one encoding per category (`RTTI-SPEC-01/02`) | deviation 2★ |
-| Terminology & definition | Roadworks keep a lane open, closures close all lanes in a direction (`RTTI-TERM-01`, `DQ-RW-001/002`) | conflict 2★ |
-| Location referencing | Best method per record: OpenLR with valid WGS 84 points, ALERT-C, coordinates (`RTTI-LOC-01`) | 5★ / 4★ / 3★ (2★ for unplanned closures) / 0 |
-| Linear referencing | A polyline on every record: a `gmlLineString` with at least two distinct positions (a zero-length line is a point), or a structured OpenLR line whose points are valid WGS 84 positions at most 15 km apart (`RTTI-LIN-01/02/03`) | missing 0 |
-| ↳ Direction | Only on records with a polyline: is the traffic direction along it unambiguous? Counts: both directions affected; an OpenLR line (its direction section), or OpenLR whose end points match the `gmlLineString` ends within the OpenLR offsets; `aligned`/`opposite` on a linear element given by coordinates; a compass direction matching the polyline bearing. Vertex order alone, ALERT-C direction (relative to the location table) or `aligned` on a coded road are ambiguous (`RTTI-DIR-01`); OpenLR that does not fit the polyline is a contradiction (`RTTI-DIR-02`); references that disagree make it ambiguous (`RTTI-DIR-03`) | not unambiguous 2★ |
-| Accuracy | Upper bound from coordinate resolution (significant decimals) (`RTTI-ACC-01`); points far from their own polyline (`RTTI-ACC-02`) | per distance thresholds |
-| Correctness | Share of records without internal contradictions | per % thresholds |
-| Completeness | Attribute completeness (start, end, polyline, direction, effect or cause), as the spec defines it for events | per % thresholds |
-| RTTI event message ID | id, version and version time on every record; no reused ids; probable duplicates (`RTTI-ID-01/02`) | problem 2★ |
-| Outdated messages | Age of ended records at `publicationTime` | 24 h 5★ … 4 weeks 1★ |
-| Validity, road type, lane level, vehicle classes, cause type | Start/end and schedules (`RTTI-VAL-01`), lane detail per situation, vehicle characteristics, closure causes (`RTTI-CAUSE-01`) | per table |
-| Pre-announcement, short-term events | Lead time from creation to start; unplanned works present | shown, no level |
-| Update cycle, timeliness, secure API, ID stability | Not shown for an uploaded file: they need repeated downloads or the access URL. Missing creation or version times are still reported (`RTTI-TIME-01`) | — |
-
-Assumptions:
-
-- **Planned vs unplanned.** `urgentRoadworks`, else the lead time from `situationRecordCreationTime`
-  to `overallStartTime`: 24 h or more is planned. This boundary is the viewer's choice, not the spec's.
-- **FRC is unknown.** Direction is required on every record, although the spec asks for it on FRC 3–6
-  only. Accuracy, correctness and completeness use the looser of the FRC1–4 and FRC5–6 thresholds.
-- **Out of scope** (listed, not rated): moving or mobile maintenance, lane restrictions without a
-  roadworks cause, other record types. Static speed limits (Table 13) come via TN-ITS, not in a
-  SituationPublication.
-- **Capability checks.** Schedules and vehicle classes count once the feed uses them anywhere.
-- **Polylines in other coordinate systems.** A `gmlLineString` in another CRS (e.g. `srsName="25833"`)
-  counts as a polyline, but its direction and accuracy are not checked (`RTTI-LIN-03`).
-
-**Per record:** the inspector's **QA** tab shows which criteria the selected record holds down and
-why, including the rule and message behind each internal contradiction, followed by every finding
-about the record. Record links in the RTTI panel open this tab.
-
-</details>
+- **[Checks](https://graphmasters.github.io/nap-roadworks-viewer/docs/checks/):** the XML, DATEX II, XSD and profile layers, and the rules on records
+  (`SEM`, `LOC`, `LANE`, `REF`) and on OpenLR (`OLR-001`…`OLR-006`).
+- **[Using the viewer](https://graphmasters.github.io/nap-roadworks-viewer/docs/usage/):** the report, the record list and its filters, the order in which
+  a record's location is drawn on the map, and the inspector tabs.
+- **[Matching and lanes](https://graphmasters.github.io/nap-roadworks-viewer/docs/matching-lanes/):** how OpenStreetMap candidates are scored, how merged
+  tile features are split into OSM ways, and how `laneStatusCoded` and `extendedLaneStatusCoded` are
+  read.
+- **[Passability and contradictions](https://graphmasters.github.io/nap-roadworks-viewer/docs/passability/):** the classes and routing actions, and the
+  contradiction checks `DQ-RW-001` (a closure whose cause only bans stopping or parking) and
+  `DQ-RW-002` (a closure that keeps lanes open in both directions).
+- **[RTTI 5-Star ceilings](https://graphmasters.github.io/nap-roadworks-viewer/docs/rtti/):** which criteria are checked in the file, what counts as a
+  polyline and an unambiguous direction, and the assumptions behind the ceilings.
 
 ## Use it in Node.js
 
