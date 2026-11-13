@@ -429,7 +429,17 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-view]'))
     if (btn.dataset['view'] === 'map') roadMap.map.resize()
   })
 
+// The "Privacy" link in the map attribution opens the privacy dialog instead of following #privacy.
+const privacyDialog = $('privacy') as HTMLDialogElement
+document.addEventListener('click', (e) => {
+  // Matched by href: MapLibre's attribution control drops other attributes such as data-*.
+  if (!(e.target instanceof Element) || !e.target.closest('a[href="#privacy"]')) return
+  e.preventDefault()
+  privacyDialog.showModal()
+})
+
 window.addEventListener('keydown', (e) => {
+  if (privacyDialog.open) return // Esc closes the dialog, not the selection.
   if (e.key === 'Escape' && state.index !== null && !(e.target instanceof HTMLInputElement)) select(null, false)
 })
 

@@ -1,16 +1,32 @@
 # NAP Roadworks Viewer
 
-Inspect **DATEX II roadworks and road-closure publications** in the browser: XML, schema and
-profile checks, a map, OpenStreetMap road lookup, lane comparison and passability analysis.
+NAP Roadworks Viewer checks DATEX II roadworks and road-closure feeds from National Access Points
+(NAPs). It runs entirely in your browser. Open a feed to validate it, see its records on a map and
+compare them with OpenStreetMap.
 
-**Demo:** <https://graphmasters.github.io/nap-roadworks-viewer/>. Open or drop a DATEX II XML file,
-plain or gzip-compressed. The file is processed in your browser and is not uploaded.
+- Open source and self-contained: a JavaScript app under the Apache License 2.0, with no backend.
+  It is served as static files from GitHub Pages and doesn't use any Graphmasters servers.
+- Your file stays on your device: the browser processes the XML in a Web Worker, and the file is
+  never uploaded or stored.
+- Bring your own data: download the XML feed from the NAP yourself, then open or drop it into the
+  viewer (plain or gzip).
+- Lanes, not pins: DATEX II lane status next to the OpenStreetMap lane layout of the matched road,
+  with a passability class and routing action per record.
+- Visible quality: XML, XSD and profile checks, contradiction checks such as `DQ-RW-001`, and TISA
+  RTTI 5-Star ceilings per criterion, each linked to the affected records.
+- Public map and OpenStreetMap data: map tiles from [OpenFreeMap](https://openfreemap.org), fonts
+  and map icons from the BKG basemap.de server, and road details from the public OSM API and the
+  Overpass instances run by [FOSSGIS](https://fossgis.de) and [private.coffee](https://private.coffee).
+  Thanks to all of them! These requests carry tile coordinates, OSM way ids or small bounding boxes,
+  so they show roughly where your records are (see [Privacy](#privacy)).
+
+**Demo:** <https://graphmasters.github.io/nap-roadworks-viewer/>
 
 ![NAP Roadworks Viewer with Schleswig-Holstein roadworks: the record list on the left, a K 11 roadworks record on the Alte Lübecker Chaussee on the map, and the Lanes tab comparing its DATEX II lane status (closed lane, cycle and foot paths closed, reversible lane) with the OSM lane layout and way direction](docs/screenshot.webp)
 
-*Cycle-path works on the K 49 near Puttgarden (Fehmarn). Lanes tab: the DATEX II lane status
-(`Fu2o`: cycle path closed, both lanes open) next to the usual OSM layout of the matched way, with a
-compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein
+*Roadworks on the K 11, Alte Lübecker Chaussee. Lanes tab: the DATEX II lane status (`x2w`;
+extended `GFLx2w`: foot and cycle paths closed, lane closed, reversible lane) next to the usual OSM
+layout of the matched way, with a compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein
 (LBV.SH)](https://mobilithek.info/offers/110000000003237002) via Mobilithek, licence-free.*
 
 ## What it does
@@ -23,6 +39,9 @@ compass for its direction. Data: [Landesbetrieb Straßenbau und Verkehr Schleswi
 | **Profile checks** | Profile detection (MDM roadworks profile 04-00-00, NDW situation feeds, generic v2/v3) with heuristic rules, labelled as heuristics. |
 | **Extensions** | Official extension mechanisms (v2 `…Extension`, v3 `_…Extension`) apart from other namespaces, with element counts. |
 | **Records** | Every `situationRecord` normalised to one model: type, validity, management type, cause links, lane status, location methods. Feeds with lane status codes get a lane-configuration filter (reversible lane, hard shoulder open/closed, narrowed or closed lane, parking lane and restrictions, cycleway and pedestrian path open/closed) with lane-status-viewer icons, which also mark records in the Situation section of the Record tab. |
+| **Record list** | Filters by record type (with counts), passability, location (on the map, not drawable, OpenLR present) and "active now", plus a free-text search over id, situation id, road number and name, description, record type and management types. Only visible rows are rendered, so feeds with 60,000+ records stay fast. ↑/↓ moves through the list, Esc clears the selection. |
+| **Inspector** | Tabs Record, QA, XML (original XML of the record or its situation), Lanes, Matching and OSM (tags linked to the OSM wiki). Findings in the report and the RTTI panel jump to the record and open the right tab. |
+| **Interface** | Map clicks select a record or an OSM road. The map position is kept in the URL (`#map=…`); nothing about the file is. Dark mode follows the system setting, motion is reduced on request, and below 900 px the layout switches between Feed, Map and Inspector. A progress bar shows bytes, situations and records while a file loads. The map credits link to the Impressum and to a Privacy dialog that lists every service the browser contacts. |
 | **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
@@ -147,11 +166,15 @@ repository contains no feed data. The folder names are those `test/samples.test.
 ## Privacy
 
 - The DATEX II file is read and analysed locally (Web Worker). It is not uploaded or stored.
-- Map tiles come from OpenFreeMap. The map style and sprites come from the
-  [basemap-world-openfreemap](https://github.com/Graphmasters/basemap-world-openfreemap) GitHub Pages site.
+- The app is static files on GitHub Pages; there is no backend and no Graphmasters server.
+- Map tiles come from OpenFreeMap (`tiles.openfreemap.org`). The map style comes from the
+  [basemap-world-openfreemap](https://github.com/Graphmasters/basemap-world-openfreemap) GitHub Pages
+  site; its fonts and sprites come from the BKG basemap.de server (`sgx.geodatenzentrum.de`). The map
+  moves to your records and matching reads z14 tiles along a record, so tile requests show roughly
+  where your records are.
 - Requests to the OSM API (`api.openstreetmap.org`) are made only when you select a road, use a
-  matching candidate or run matching. They contain a way id or a small bounding box, never data from
-  your file.
+  matching candidate or run matching (which starts by itself when you select a record with a line).
+  They contain a way id or a small bounding box; during matching that box comes from the record.
 - Matching may query Overpass (`overpass-api.de`, as fallback `overpass.private.coffee`) or the OSM
   API with a road class and the bounding box of the matched part of the record. No other data from
   your file is sent.
@@ -203,7 +226,8 @@ The repository contains no real feed data. Tests use small, hand-written XML doc
 
 Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party components and data
 credits are listed in [ATTRIBUTION.md](ATTRIBUTION.md). Map: © OpenStreetMap contributors (ODbL),
-OpenMapTiles, OpenFreeMap; map style basemap.world / BKG (CC BY 4.0), adapted by Graphmasters.
+OpenMapTiles, OpenFreeMap; map style basemap.world © BKG (CC BY 4.0), modified by Graphmasters
+([basemap-world-openfreemap](https://github.com/Graphmasters/basemap-world-openfreemap)).
 
 When you publish screenshots or results from a DATEX II feed, credit its publisher as their
 licence requires.
