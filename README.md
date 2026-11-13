@@ -8,19 +8,17 @@ A browser tool that checks [DATEX II](https://datex2.eu/) roadworks and road-clo
 National Access Points (NAPs), shows their records on a map and compares them with
 [OpenStreetMap](https://www.openstreetmap.org/).
 
-**[Open the viewer →](https://graphmasters.github.io/nap-roadworks-viewer/)** No installation, no
-account. Your file is analysed in your browser and is never uploaded.
+> [!TIP]
+> - **[Open the viewer →](https://graphmasters.github.io/nap-roadworks-viewer/)** No installation, no
+>   account. Your file is analysed in your browser and is never uploaded.
+> - **[Read the documentation →](https://graphmasters.github.io/nap-roadworks-viewer/docs/)** How
+>   to get a feed, use the viewer and read its checks, with tested XML examples.
 
 [![NAP Roadworks Viewer: the record list on the left, a roadworks record on the map, and the Lanes tab comparing the record's DATEX II lane status with the OpenStreetMap lane layout of the matched road](docs/screenshot.webp)](https://graphmasters.github.io/nap-roadworks-viewer/)
 
 <sub>The Lanes tab of a roadworks record: its DATEX II lane status next to the OpenStreetMap lane
 layout of the matched road. Data: [Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein
 (LBV.SH)](https://mobilithek.info/offers/110000000003237002) via Mobilithek, licence-free.</sub>
-
-**Contents:** [What it does](#what-it-does) · [Quick start](#quick-start) · [Privacy](#privacy) ·
-[Limitations](#limitations) · [How the checks work](#how-the-checks-work) ·
-[Use it in Node.js](#use-it-in-nodejs) · [Development](#development) ·
-[Contributing](#contributing) · [Licence](#licence) · [Credits](#credits)
 
 ## What it does
 
@@ -84,15 +82,22 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 
 Requests to the OSM API and Overpass are made only when you select a road, use a matching
 candidate or select a record with a line (matching then starts by itself). The **Privacy** dialog,
-linked from the map credits in the app, lists the same services.
+linked from the map credits in the app, lists the same services, and so does the
+[Privacy](https://graphmasters.github.io/nap-roadworks-viewer/docs/privacy/) page of the
+documentation.
 
 ## Limitations
 
+The main ones are below; the
+[Limitations](https://graphmasters.github.io/nap-roadworks-viewer/docs/limitations/) page of the
+documentation has the full list.
+
 - **Location referencing.** Lines are drawn from `gmlLineString` (v2 `linearExtension`, v3
-  `LinearLocation`) in WGS 84 degrees and from `LinearElementByPoints`. Structured OpenLR is
-  decoded but not map-matched, so a record whose only line is OpenLR is drawn as a straight line
-  through its location reference points and marked *approximate*. Binary OpenLR is detected, not
-  decoded. ALERT-C, TPEG and coded linear-element references are listed, not decoded.
+  `LinearLocation`) in WGS 84 degrees and from a `LinearElementByPoints` in a linear location. In a
+  `pointAlongLinearElement` the point along the element is not computed, so its points are shown
+  as points. Structured OpenLR is decoded but not map-matched, so a record whose only line is
+  OpenLR is drawn as a straight line through its location reference points and marked
+  *approximate*. Binary OpenLR is detected, not decoded. ALERT-C, TPEG and coded linear-element references are listed, not decoded.
 - **Axis order.** `posList` is read as "lat lon", as EPSG:4326 defines it. "lon lat" files are
   detected from explicit latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds and
@@ -108,7 +113,12 @@ linked from the map credits in the app, lists the same services.
 
 ## How the checks work
 
-The sections below document each step in detail. They are collapsed to keep this page short.
+The documentation explains each step with examples:
+[Checks](https://graphmasters.github.io/nap-roadworks-viewer/docs/checks/),
+[Matching and lanes](https://graphmasters.github.io/nap-roadworks-viewer/docs/matching-lanes/),
+[Passability and contradictions](https://graphmasters.github.io/nap-roadworks-viewer/docs/passability/)
+and [RTTI 5-Star ceilings](https://graphmasters.github.io/nap-roadworks-viewer/docs/rtti/). The
+sections below summarise them and are collapsed to keep this page short.
 
 <details>
 <summary><strong>Feature reference</strong></summary>
@@ -124,12 +134,12 @@ The sections below document each step in detail. They are collapsed to keep this
 | **Record list** | Filters by record type (with counts), passability, location (on the map, not drawable, OpenLR present) and "active now", plus a free-text search over id, situation id, road number and name, description, record type and management types. Only visible rows are rendered, so feeds with 60,000+ records stay fast. ↑/↓ moves through the list, Esc clears the selection. |
 | **Inspector** | Tabs Record, QA, XML (original XML of the record or its situation), Lanes, Matching and OSM (tags linked to the OSM wiki). Findings in the report and the RTTI panel jump to the record and open the right tab. |
 | **Interface** | Map clicks select a record or an OSM road. The map position is kept in the URL (`#map=…`); nothing about the file is. Dark mode follows the system setting, motion is reduced on request, and below 900 px the layout switches between Feed, Map and Inspector. A progress bar shows bytes, situations and records while a file loads. The map credits link to the Impressum and to a Privacy dialog that lists every service the browser contacts. |
-| **Map** | Lines, in order of preference: `gmlLineString`; the points of a `LinearElementByPoints`, cut to its `fromPoint`/`toPoint`; a straight line through structured OpenLR location reference points (*approximate*). Point-only records as points marked *approximate*; other location methods listed with a reason. The inspector reports OpenLR road classes (FRC, LFRCNP) as published, next to the OSM road class hierarchy for comparison. |
+| **Map** | Lines, in order of preference: `gmlLineString`; the points of a `LinearElementByPoints` in a linear location (`linearWithinLinearElement`), cut to its `fromPoint`/`toPoint`; a straight line through structured OpenLR location reference points (*approximate*). Point-only records as points marked *approximate*; other location methods listed with a reason. The inspector reports OpenLR road classes (FRC, LFRCNP) as published, next to the OSM road class hierarchy for comparison. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
 | **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
 | **Passability** | Per record: passable, restricted, closed, conditional, conflicting or unknown, plus the routing action (block, do not block, manual review). |
-| **OpenLR** | Whether the feed carries OpenLR, per record and in total. Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2 `openlrExtendedLinear` / `openlrExtendedPoint`) is decoded: location reference points with coordinates, FRC, form of way, bearing, LFRCNP, DNP, offsets. Its coordinates are checked as WGS 84 decimal degrees (`OLR-001`…`OLR-006`). The inspector lists the points; the map marks them for the selected record. Binary OpenLR is detected, not decoded. |
+| **OpenLR** | Whether the feed carries OpenLR, per record and in total. Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2 `openlrExtendedLinear` / `openlrExtendedPoint`) is decoded: location reference points with coordinates, FRC, form of way, bearing, LFRCNP, DNP, offsets. Its coordinates are checked as WGS 84 decimal degrees and against the record's own `gmlLineString`, `LinearElementByPoints` line or point coordinates, never against the line drawn through the OpenLR points (`OLR-001`…`OLR-006`). The inspector lists the points; the map marks them for the selected record. Binary OpenLR is detected, not decoded. |
 | **RTTI 5-Star** | Star-level ceilings per criterion of the [TISA RTTI 5-Star Rating Specification](https://tisa.org/rtti-5-star-rating-specification/) for planned and unplanned roadworks and road closures (see below). |
 
 </details>
@@ -137,8 +147,9 @@ The sections below document each step in detail. They are collapsed to keep this
 <details>
 <summary><strong>Location referencing and OpenLR</strong></summary>
 
-A `LinearElementByPoints` is cut to its `fromPoint`/`toPoint`, with distances measured along its
-points.
+A `LinearElementByPoints` in a linear location (`linearWithinLinearElement`) is cut to its
+`fromPoint`/`toPoint`, with distances measured along its points. In a `pointAlongLinearElement` the
+point along the element is not computed, so its points are shown as points.
 
 Structured OpenLR (DATEX II v3 `openlrLinear`, `openlrPointLocationReference`; v2
 `openlrExtendedLinear` / `openlrExtendedPoint`) is decoded and its points are marked for the
@@ -308,10 +319,13 @@ npm run preview      # serve the built site locally
 | [`src/`](src) | The analysis library: streaming XML parser, DATEX II detection, record normalisation, checks, OpenLR, lanes, passability, matching, RTTI 5-Star |
 | [`app/`](app) | The web app: MapLibre map, Web Worker, XSD validation, report, record list, inspector |
 | [`test/`](test) | Vitest suites and hand-written fixtures |
+| [`docs/`](docs) | The documentation site (MkDocs) and its tested XML examples |
 
 Every pull request and every push to `main` runs the [CI workflow](.github/workflows/ci.yml)
-(typecheck, tests and both builds). Pushes to `main` also deploy the app to GitHub Pages
-([Deploy Pages](.github/workflows/pages.yml)).
+(typecheck, tests, both builds and `mkdocs build --strict`). Pushes to `main` also deploy the app
+and the documentation to GitHub Pages ([Deploy Pages](.github/workflows/pages.yml)). How to build
+the documentation locally (Python 3.11.5 or later, `requirements-docs.txt`) is described under
+[This documentation](https://graphmasters.github.io/nap-roadworks-viewer/docs/development/#this-documentation).
 
 Lane interpretation, tile feature ids and the OSM API client come from the
 [osm-lanes](https://github.com/Graphmasters/osm-lanes) package, lane-status decoding and icons
@@ -349,7 +363,7 @@ Issues and pull requests are welcome.
   Name the DATEX II version, the NAP or publisher and the record id, and describe what you
   expected. If you include an excerpt of a feed, check that its licence allows that.
 - **Pull requests:** run `npm run typecheck` and `npm test` before you open one; CI runs these plus
-  both builds. Cover new behaviour with small, hand-written XML in
+  both builds and the documentation build. Cover new behaviour with small, hand-written XML in
   [`test/fixtures.ts`](test/fixtures.ts) rather than real feed data.
 
 ## Licence

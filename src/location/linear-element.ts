@@ -99,11 +99,18 @@ function cut(pts: Referent[], cum: number[], a: number, b: number): Array<[numbe
   return out
 }
 
-/** Reads every LinearElementByPoints in `location` as a polyline cut to its covered section. */
-export function linearElementLines(location: XmlElement, warnings: string[]): LinearElementLine[] {
+/**
+ * Reads every LinearElementByPoints of a linear location (`linearWithinLinearElement`) in
+ * `location` as a polyline cut to its covered section. One inside a `pointAlongLinearElement` is
+ * skipped: a point along the element is not the element's line. `elements` counts the
+ * LinearElementByPoints read, including those that could not be drawn.
+ */
+export function linearElementLines(location: XmlElement, warnings: string[]): { lines: LinearElementLine[]; elements: number } {
   const out: LinearElementLine[] = []
+  let elements = 0
   for (const le of descendants(location, 'linearElement')) {
-    if (!isLinearElementByPoints(le)) continue
+    if (le.parent?.local !== 'linearWithinLinearElement' || !isLinearElementByPoints(le)) continue
+    elements++
     const start = referentOf(childrenNamed(le, 'startPointOfLinearElement')[0])
     const end = referentOf(childrenNamed(le, 'endPointOfLinearElement')[0])
     const mids = childrenNamed(le, 'intermediatePointOnLinearElement')
@@ -150,5 +157,5 @@ export function linearElementLines(location: XmlElement, warnings: string[]): Li
     const coords = cut(pts, cum, a, b)
     out.push({ coords: from > to ? coords.reverse() : coords, elementLengthM: total, cut: { fromM: from, toM: to }, reversed: from > to || undefined })
   }
-  return out
+  return { lines: out, elements }
 }
