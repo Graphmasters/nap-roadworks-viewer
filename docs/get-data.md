@@ -71,12 +71,21 @@ For real schema validation, the viewer needs the XSD files of the DATEX II versi
 uses. It downloads nothing by itself; you select the files ([how](usage.md#xsd-validation)).
 
 - **DATEX II schemas** for the versions and the standard parts are available from the
-  [DATEX II specifications](https://datex2.eu/specifications/) page.
+  [DATEX II specifications](https://datex2.eu/specifications/) page; the full v3.x schemas are on the
+  download pages of [docs.datex2.eu](https://docs.datex2.eu/downloads/). For a v3 situation
+  publication, select `DATEXII_3_D2Payload.xsd` together with the files it imports.
 - **National profiles** are published by their owners. For Germany, the roadworks profile
-  (*Baustellenprofil*, the MDM roadworks profile) can be downloaded from the
-  [Mobilithek download page](https://mobilithek.info/help/download).
+  (*Baustellenprofil*, MDM roadworks profile 04-00-00) can be downloaded from the
+  [Mobilithek download page](https://mobilithek.info/help/download). Feeds that add an
+  `extendedLaneStatusCoded` ([Lanes](matching-lanes.md#lanes)) do not validate against it.
 - For real-time traffic information, the [DATEX II RTTI recommended reference profile](https://docs.datex2.eu/recommended-profiles/rrp/rtti/)
   describes which record types and value lists to use. The [RTTI 5-Star ceilings](rtti.md) refer to it.
+  It comes without a ready-made XSD: you generate one in the
+  [DATEX II webtool schema wizard](https://webtool.datex2.eu/wizard), where you choose the profile and
+  your location referencing method.
+
+The [XML examples](examples.md) were validated this way: `lane-closure-v2.xml` against the German
+roadworks profile, `locations-v3.xml` against the DATEX II v3.5 schemas.
 
 Independently of XSD validation, the viewer runs heuristic [profile checks](checks.md#profile-checks)
 for the German roadworks profile, Dutch situation feeds and generic DATEX II v2 and v3.

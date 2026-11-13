@@ -65,7 +65,8 @@ has, in this order:
 The Geometry row of the Record tab says which of these the drawn geometry comes from. It marks steps
 3–5 *approximate*: OpenLR carries no road shape between its points, so its line cuts corners. On the
 map, these look like any other line or point. OpenLR point locations are not drawn as lines. Records
-with other location methods are listed with the reason they are not drawn.
+with other location methods are listed with the reason they are not drawn. The [location examples](examples.md#locations-in-v3)
+show the first three in XML.
 
 - **Select record** mode (default): click a record on the map to select it. A record drawn as a line
   is matched to OSM roads by itself, and the best way is highlighted.

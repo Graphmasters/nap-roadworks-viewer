@@ -1,4 +1,5 @@
-# Documentation site (MkDocs + Material), built into _site/docs/ next to the app.
+# Documentation site (MkDocs, built-in theme), built into _site/docs/ next to the app.
 # pip install -r requirements-docs.txt && mkdocs serve
 mkdocs==1.6.1
-mkdocs-material==9.8.1
+pymdown-extensions==13.1
+Pygments==2.21.0

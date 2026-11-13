@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic DATEX II v2 example in the style of German roadworks feeds that add an
+     extendedLaneStatusCoded next to laneStatusCoded. That element is not part of the published
+     roadworks profile (MDM roadworks profile 04-00-00) and has no public documentation; without it,
+     the file is valid against the profile XSD. Ids, places and values are invented. -->
+<d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" modelBaseVersion="2">
+  <exchange>
+    <supplierIdentification>
+      <country>de</country>
+      <nationalIdentifier>EXAMPLE</nationalIdentifier>
+    </supplierIdentification>
+  </exchange>
+  <payloadPublication xsi:type="SituationPublication" lang="de">
+    <publicationTime>2026-06-01T10:00:00+02:00</publicationTime>
+    <publicationCreator>
+      <country>de</country>
+      <nationalIdentifier>EXAMPLE</nationalIdentifier>
+    </publicationCreator>
+    <!-- Cycle-path works: the cycle path is closed, both driving lanes stay open. -->
+    <situation id="EX-2" version="1">
+      <headerInformation>
+        <confidentiality>noRestriction</confidentiality>
+        <informationStatus>real</informationStatus>
+      </headerInformation>
+      <situationRecord id="EX-2-W" version="1" xsi:type="MaintenanceWorks">
+        <situationRecordCreationTime>2026-05-01T08:00:00+02:00</situationRecordCreationTime>
+        <situationRecordVersionTime>2026-05-01T08:00:00+02:00</situationRecordVersionTime>
+        <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+        <validity>
+          <validityStatus>definedByValidityTimeSpec</validityStatus>
+          <validityTimeSpecification>
+            <overallStartTime>2026-06-08T07:00:00+02:00</overallStartTime>
+            <overallEndTime>2026-06-26T17:00:00+02:00</overallEndTime>
+          </validityTimeSpecification>
+        </validity>
+        <impact>
+          <impactExtension>
+            <impactExtended>
+              <laneStatusCoded>u1o</laneStatusCoded>
+              <extendedLaneStatusCoded>Fu1o</extendedLaneStatusCoded>
+            </impactExtended>
+          </impactExtension>
+        </impact>
+        <groupOfLocations xsi:type="Linear">
+          <linearExtension>
+            <linearExtended>
+              <gmlLineString>
+                <posList>52.01000 9.52000 52.01100 9.52200 52.01200 9.52400</posList>
+              </gmlLineString>
+            </linearExtended>
+          </linearExtension>
+        </groupOfLocations>
+        <actionPlanIdentifier>EX-2</actionPlanIdentifier>
+        <roadMaintenanceType>roadsideWork</roadMaintenanceType>
+      </situationRecord>
+    </situation>
+    <!-- A full closure whose linked cause only prohibits stopping: DQ-RW-001. -->
+    <situation id="EX-3" version="1">
+      <headerInformation>
+        <confidentiality>noRestriction</confidentiality>
+        <informationStatus>real</informationStatus>
+      </headerInformation>
+      <situationRecord id="EX-3-W" version="1" xsi:type="MaintenanceWorks">
+        <situationRecordCreationTime>2026-05-01T08:00:00+02:00</situationRecordCreationTime>
+        <situationRecordVersionTime>2026-05-01T08:00:00+02:00</situationRecordVersionTime>
+        <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+        <validity>
+          <validityStatus>definedByValidityTimeSpec</validityStatus>
+          <validityTimeSpecification>
+            <overallStartTime>2026-06-08T07:00:00+02:00</overallStartTime>
+            <overallEndTime>2026-06-12T17:00:00+02:00</overallEndTime>
+          </validityTimeSpecification>
+        </validity>
+        <impact>
+          <impactExtension>
+            <impactExtended>
+              <laneStatusCoded>u1o</laneStatusCoded>
+              <extendedLaneStatusCoded>Hu1oH</extendedLaneStatusCoded>
+            </impactExtended>
+          </impactExtension>
+        </impact>
+        <groupOfLocations xsi:type="Linear">
+          <linearExtension>
+            <linearExtended>
+              <gmlLineString>
+                <posList>52.02000 9.54000 52.02100 9.54200</posList>
+              </gmlLineString>
+            </linearExtended>
+          </linearExtension>
+        </groupOfLocations>
+        <actionPlanIdentifier>EX-3</actionPlanIdentifier>
+        <roadMaintenanceType>roadworks</roadMaintenanceType>
+      </situationRecord>
+      <situationRecord id="EX-3-C" version="1" xsi:type="RoadOrCarriagewayOrLaneManagement">
+        <situationRecordCreationTime>2026-05-01T08:00:00+02:00</situationRecordCreationTime>
+        <situationRecordVersionTime>2026-05-01T08:00:00+02:00</situationRecordVersionTime>
+        <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+        <validity>
+          <validityStatus>definedByValidityTimeSpec</validityStatus>
+          <validityTimeSpecification>
+            <overallStartTime>2026-06-08T07:00:00+02:00</overallStartTime>
+            <overallEndTime>2026-06-12T17:00:00+02:00</overallEndTime>
+          </validityTimeSpecification>
+        </validity>
+        <cause xsi:type="ManagedCause">
+          <managedCause targetClass="SituationRecord" id="EX-3-W" version="1"/>
+        </cause>
+        <groupOfLocations xsi:type="Linear">
+          <linearExtension>
+            <linearExtended>
+              <gmlLineString>
+                <posList>52.02000 9.54000 52.02100 9.54200</posList>
+              </gmlLineString>
+            </linearExtended>
+          </linearExtension>
+        </groupOfLocations>
+        <actionPlanIdentifier>EX-3</actionPlanIdentifier>
+        <complianceOption>mandatory</complianceOption>
+        <roadOrCarriagewayOrLaneManagementType>roadClosed</roadOrCarriagewayOrLaneManagementType>
+      </situationRecord>
+    </situation>
+  </payloadPublication>
+</d2LogicalModel>

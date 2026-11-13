@@ -25,8 +25,8 @@ Some records contradict themselves or each other. The viewer flags two patterns.
 ### DQ-RW-001: closure that contradicts its cause
 
 A record claims a full closure (`roadClosed`, `carriagewayClosures`), but the record it names as its
-cause (`managedCause`) only describes a stopping or parking prohibition: lane codes such as `H` or `P`,
-no closed lane. The steps:
+cause (`managedCause`) only describes a stopping or parking prohibition: extended lane codes such as
+`H` or `P` (see [Lanes](matching-lanes.md#lanes)), no closed lane. The steps:
 
 1. Resolve the `managedCause` links inside the situation. Missing (`REF-001`) and cyclic (`REF-002`)
    references are reported separately.
@@ -38,10 +38,37 @@ no closed lane. The steps:
    overlap within 30 m) at an overlapping time, say so: the case needs review rather than correction.
    A straight line through OpenLR points cuts corners, so this test is less reliable for it.
 
-**Example: closed or not?** A `roadClosed` record whose cause only carries the lane code `H2H`: no
-stopping on either side, no lane closed for driving. Both cannot be true at the same time. The viewer flags
-a possible incorrect road closure and recommends **manual review**; only the publisher can tell what is
-really happening on site.
+#### Example: closed or not?
+
+From [extended-lane-status-v2.xml](examples/extended-lane-status-v2.xml): a closure record reports
+`roadClosed` and names a works record as its cause.
+
+<!-- example: extended-lane-status-v2.xml -->
+```xml
+<cause xsi:type="ManagedCause">
+  <managedCause targetClass="SituationRecord" id="EX-3-W" version="1"/>
+</cause>
+```
+
+<!-- example: extended-lane-status-v2.xml -->
+```xml
+<complianceOption>mandatory</complianceOption>
+<roadOrCarriagewayOrLaneManagementType>roadClosed</roadOrCarriagewayOrLaneManagementType>
+```
+
+The cause's lane status keeps both lanes open; the extended code adds a no-stopping zone (`H`) on
+each side:
+
+<!-- example: extended-lane-status-v2.xml -->
+```xml
+<laneStatusCoded>u1o</laneStatusCoded>
+<extendedLaneStatusCoded>Hu1oH</extendedLaneStatusCoded>
+```
+
+Both cannot be true at the same time. The viewer flags a possible incorrect road closure
+(`DQ-RW-001`), classifies the closure as **conflicting** and recommends **manual review**; only the
+publisher can tell what is really happening on site. The works record itself is *passable*: a
+stopping ban is not a driving ban.
 
 ### DQ-RW-002: closure with open lanes in both directions
 

@@ -4,8 +4,8 @@
 (NAPs) and links them to the road network, lane by lane. It runs entirely in your browser: open a
 feed to validate it, see its records on a map and compare them with OpenStreetMap.
 
-[Open the viewer](https://graphmasters.github.io/nap-roadworks-viewer/){ .md-button .md-button--primary }
-[Source code on GitHub](https://github.com/Graphmasters/nap-roadworks-viewer){ .md-button }
+[Open the viewer](https://graphmasters.github.io/nap-roadworks-viewer/){ .btn .btn-primary }
+[Source code on GitHub](https://github.com/Graphmasters/nap-roadworks-viewer){ .btn .btn-outline-primary }
 
 ![NAP Roadworks Viewer: the record list on the left, a roadworks record drawn as a line on the map, and the Lanes tab comparing the DATEX II lane status (lane closed, foot and cycle paths closed, reversible lane) with the OpenStreetMap lane layout of the matched road](screenshot.webp)
 
@@ -45,28 +45,14 @@ file allows: see [RTTI 5-Star ceilings](rtti.md).
 
 ## Why use it
 
-<div class="grid cards" markdown>
-
-- **Lanes, not pins**
-
-    Which lanes, directions and road users are affected: DATEX II lane status next to the
-    OpenStreetMap lane layout of the matched road.
-
-- **Visible quality**
-
-    XML, XSD and profile checks, contradiction checks and selected TISA RTTI 5-Star criteria, file
-    by file, each linked to the affected records.
-
-- **From feed to road**
-
-    Each record matched to OpenStreetMap ways, with the score components shown, not hidden.
-
-- **Free, open, private**
-
-    Apache License 2.0. Runs in your browser; the file is never uploaded. No Graphmasters server is
-    involved.
-
-</div>
+- **Lanes, not pins.** Which lanes, directions and road users are affected: DATEX II lane status next
+  to the OpenStreetMap lane layout of the matched road.
+- **Visible quality.** XML, XSD and profile checks, contradiction checks and selected TISA RTTI 5-Star
+  criteria, file by file, each linked to the affected records.
+- **From feed to road.** Each record matched to OpenStreetMap ways, with the score components shown,
+  not hidden.
+- **Free, open, private.** Apache License 2.0. Runs in your browser; the file is never uploaded. No
+  Graphmasters server is involved.
 
 ## Try it with your feed
 
@@ -74,7 +60,8 @@ file allows: see [RTTI 5-Star ceilings](rtti.md).
 2. Open [graphmasters.github.io/nap-roadworks-viewer](https://graphmasters.github.io/nap-roadworks-viewer/).
 3. Drop the file into the window, or use **Open DATEX II file…** (plain XML or gzip).
 
-Then follow [Using the viewer](usage.md). Which checks do you need for your feed? Issues and pull
+Then follow [Using the viewer](usage.md). No file at hand? The [XML examples](examples.md) are small
+synthetic files you can open right away. Which checks do you need for your feed? Issues and pull
 requests are welcome on [GitHub](https://github.com/Graphmasters/nap-roadworks-viewer/issues).
 
 !!! note "Credit the publisher"

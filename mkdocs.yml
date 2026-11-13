@@ -22,6 +22,7 @@ nav:
   - Get started:
       - Getting a DATEX II file: get-data.md
       - Using the viewer: usage.md
+      - XML examples: examples.md
   - What the viewer checks:
       - Checks: checks.md
       - Matching and lanes: matching-lanes.md
@@ -35,55 +36,31 @@ nav:
       - References: references.md
 
 theme:
-  name: material
-  language: en
-  # System fonts: no request to Google Fonts.
-  font: false
-  icon:
-    repo: fontawesome/brands/github
-  palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: indigo
-      accent: red
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: indigo
-      accent: red
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-  features:
-    - navigation.sections
-    - navigation.top
-    - navigation.footer
-    - navigation.indexes
-    - search.highlight
-    - content.code.copy
-    - content.action.edit
-    - toc.follow
+  # The built-in MkDocs theme (Bootstrap). It ships its CSS, fonts and scripts with the site.
+  name: mkdocs
+  custom_dir: docs-theme
+  locale: en
+  color_mode: auto
+  user_color_mode_toggle: true
+  navigation_depth: 3
+  # Code is highlighted at build time with Pygments (pymdownx.highlight); docs-theme/main.html
+  # loads its stylesheets. highlight.js would come from cdnjs, so it stays off.
+  highlightjs: false
 
 plugins:
   - search
 
 markdown_extensions:
-  - abbr
   - admonition
   - attr_list
   - def_list
   - footnotes
-  - md_in_html
   - tables
   - toc:
       permalink: true
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.inlinehilite
   - pymdownx.highlight:
-      anchor_linenums: true
+      use_pygments: true
+  - pymdownx.superfences
 
 validation:
   links:

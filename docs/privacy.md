@@ -30,9 +30,9 @@ the OpenStreetMap contributors whose data the matching relies on.
 
 ## This documentation site
 
-These pages are static files on GitHub Pages as well. They use your system fonts and load no web
-fonts, and the search runs in your browser. The repository link in the header asks the GitHub API
-(`api.github.com`) for the repository's star and fork count.
+These pages are static files on GitHub Pages as well. Their stylesheets, fonts and scripts are served
+with them, code is highlighted when the site is built, and the search runs in your browser. They
+load nothing from other servers.
 
 The viewer is published by Graphmasters GmbH, see the
 [Impressum](https://www.graphmasters.net/imprint).

@@ -6,8 +6,8 @@
 
 Dr. Jonas Matthias, Graphmasters GmbH. Poster, NAPCORE Mobility Data Days, Athens, 25–26 November 2026.
 
-[Poster (PDF, ISO A2, 1.8 MB)](https://graphmasters.github.io/presentations-jonas/nap-roadworks-poster/poster_nap-roadworks-viewer_jonas_matthias_graphmasters.pdf){ .md-button .md-button--primary }
-[Poster page](https://graphmasters.github.io/presentations-jonas/nap-roadworks-poster/){ .md-button }
+[Poster (PDF, ISO A2, 1.8 MB)](https://graphmasters.github.io/presentations-jonas/nap-roadworks-poster/poster_nap-roadworks-viewer_jonas_matthias_graphmasters.pdf){ .btn .btn-primary }
+[Poster page](https://graphmasters.github.io/presentations-jonas/nap-roadworks-poster/){ .btn .btn-outline-primary }
 
 > NAP Roadworks Viewer is an open-source browser tool that checks DATEX II roadworks and closure feeds
 > from National Access Points: schema and profile checks, selected TISA RTTI 5-Star criteria,

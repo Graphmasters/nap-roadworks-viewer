@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic DATEX II v2 example following the German roadworks profile (MDM roadworks
+     profile 04-00-00): a lane closure on a dual carriageway. Ids, places and values are invented.
+     Valid against the profile XSD. -->
+<d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" modelBaseVersion="2">
+  <exchange>
+    <supplierIdentification>
+      <country>de</country>
+      <nationalIdentifier>EXAMPLE</nationalIdentifier>
+    </supplierIdentification>
+  </exchange>
+  <payloadPublication xsi:type="SituationPublication" lang="de">
+    <publicationTime>2026-06-01T10:00:00+02:00</publicationTime>
+    <publicationCreator>
+      <country>de</country>
+      <nationalIdentifier>EXAMPLE</nationalIdentifier>
+    </publicationCreator>
+    <situation id="EX-1" version="1">
+      <headerInformation>
+        <confidentiality>noRestriction</confidentiality>
+        <informationStatus>real</informationStatus>
+      </headerInformation>
+      <situationRecord id="EX-1-W" version="1" xsi:type="MaintenanceWorks">
+        <situationRecordCreationTime>2026-05-01T08:00:00+02:00</situationRecordCreationTime>
+        <situationRecordVersionTime>2026-05-01T08:00:00+02:00</situationRecordVersionTime>
+        <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+        <validity>
+          <validityStatus>definedByValidityTimeSpec</validityStatus>
+          <validityTimeSpecification>
+            <overallStartTime>2026-06-08T07:00:00+02:00</overallStartTime>
+            <overallEndTime>2026-06-26T17:00:00+02:00</overallEndTime>
+          </validityTimeSpecification>
+        </validity>
+        <impact>
+          <numberOfLanesRestricted>1</numberOfLanesRestricted>
+          <originalNumberOfLanes>2</originalNumberOfLanes>
+          <impactExtension>
+            <impactExtended>
+              <laneStatusCoded>sluu2xors</laneStatusCoded>
+            </impactExtended>
+          </impactExtension>
+        </impact>
+        <groupOfLocations xsi:type="Linear">
+          <linearExtension>
+            <linearExtended>
+              <gmlLineString>
+                <posList>52.00000 9.50000 52.00100 9.50200 52.00200 9.50400</posList>
+              </gmlLineString>
+            </linearExtended>
+          </linearExtension>
+        </groupOfLocations>
+        <actionPlanIdentifier>EX-1</actionPlanIdentifier>
+        <roadMaintenanceType>roadworks</roadMaintenanceType>
+      </situationRecord>
+    </situation>
+  </payloadPublication>
+</d2LogicalModel>

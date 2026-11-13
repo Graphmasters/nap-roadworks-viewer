@@ -54,8 +54,11 @@ DATEX_SAMPLES_DIR="/path/to/feeds" npx vitest run test/samples.test.ts
 
 ## This documentation
 
-The documentation is written in Markdown in `docs/` and built with
-[MkDocs](https://www.mkdocs.org) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).
+The documentation is written in Markdown in `docs/` and built with [MkDocs](https://www.mkdocs.org)
+and its built-in theme. `docs-theme/` adds the stylesheets for code highlighted at build time with
+[Pygments](https://pygments.org). The [XML examples](examples.md) in `docs/examples/` are tested by
+`test/docs-examples.test.ts`: each must give the results the pages describe, and every excerpt a page
+quotes must match its file.
 
 ```sh
 python3 -m venv .venv && . .venv/bin/activate

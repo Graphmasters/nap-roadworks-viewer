@@ -48,10 +48,43 @@ tags come from the OSM API. For merged features, the viewer looks up the clicked
 
 ## Lanes
 
-DATEX II can describe the lanes of a roadworks site precisely. The German roadworks profile, for
-example, encodes them as short strings in `laneStatusCoded` and `extendedLaneStatusCoded`: which lanes
-are open, narrowed, closed or reversible, whether the hard shoulder is in use, where stopping or
-parking is prohibited, and whether foot and cycle paths are closed.
+DATEX II can describe the lanes of a roadworks site precisely. The German roadworks profile (MDM
+roadworks profile 04-00-00) encodes the cross-section as a short string in `laneStatusCoded`, read
+across the road: lanes of the opposite direction first, then the separation, then the lanes of the
+direction of the record. Lowercase letters stand for lanes and hard shoulders, digits for the
+separation:
+
+| Symbol | Meaning |
+|---|---|
+| `u` / `o` | Open lane, opposite direction / direction of the record (`i` / `e`: narrowed) |
+| `x` | Closed lane |
+| `w` | Reversible lane, used in both directions |
+| `s` | Hard shoulder (a closed one is coded `x`, one open to traffic as a lane) |
+| `l` / `r` | Hard-shoulder separation, opposite direction / direction of the record |
+| `1` / `2` | Separation of a single carriageway / central reservation of a dual carriageway |
+
+A lane closure on a dual carriageway with hard shoulders, from
+[lane-closure-v2.xml](examples/lane-closure-v2.xml): two lanes open in the opposite direction, one of
+two lanes closed in the direction of the record.
+
+<!-- example: lane-closure-v2.xml -->
+```xml
+<impact>
+  <numberOfLanesRestricted>1</numberOfLanesRestricted>
+  <originalNumberOfLanes>2</originalNumberOfLanes>
+  <impactExtension>
+    <impactExtended>
+      <laneStatusCoded>sluu2xors</laneStatusCoded>
+    </impactExtended>
+  </impactExtension>
+</impact>
+```
+
+Several German federal states publish an `extendedLaneStatusCoded` next to it. It uses the same
+alphabet plus uppercase symbols, for example `F` and `G` for a closed cycle path and foot path, and `H`
+and `P` for no-stopping zones. The element is not part of the published profile and has no public
+documentation; the [lane-status-viewer encoding page](https://graphmasters.github.io/lane-status-viewer/docs.html)
+lists the symbols the viewer knows.
 
 The **Lanes** tab turns these codes into lane diagrams and places them next to the lane layout of the
 matched OSM way, read from its lane tags. A compass rose next to the lane graphic and arrows along the
@@ -67,9 +100,18 @@ Unknown symbols are never read as open lanes.
 
 ### Example: restricted is not closed
 
-Cycle-path works on a district road. The lane code `Fu2o` says: cycle path closed, one driving lane
-open in each direction, matching the two lanes in OpenStreetMap. The viewer classifies the record as
-**passable, do not block** for cars.
+Cycle-path works on a single-carriageway road, from
+[extended-lane-status-v2.xml](examples/extended-lane-status-v2.xml). `laneStatusCoded` shows one open
+lane in each direction; the extended code adds that the cycle path is closed:
+
+<!-- example: extended-lane-status-v2.xml -->
+```xml
+<laneStatusCoded>u1o</laneStatusCoded>
+<extendedLaneStatusCoded>Fu1o</extendedLaneStatusCoded>
+```
+
+Both driving lanes stay open, so the viewer classifies the record as **passable, do not block** for
+cars.
 
 If the feed only said "roadworks", a router could not tell such a site from a lane closure. Feeds that
 encode lane status give routers exactly the information they need.
