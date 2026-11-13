@@ -860,3 +860,37 @@ table.lrp tr.invalid td {
 .small {
   font-size: 12px;
 }
+
+/* Privacy dialog, opened from the map attribution. */
+.privacy {
+  max-width: min(36rem, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px 20px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.privacy::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.privacy h2 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.privacy ul {
+  padding-left: 1.2em;
+}
+
+.privacy li + li {
+  margin-top: 4px;
+}
+
+.privacy form {
+  margin-top: 12px;
+  text-align: right;
+}

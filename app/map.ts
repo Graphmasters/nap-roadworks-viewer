@@ -122,11 +122,14 @@ export class RoadworksMap {
       center: [9, 51.5],
       zoom: 4.5,
       hash: 'map',
+      // The style's own attribution credits OpenFreeMap, OpenMapTiles, OpenStreetMap and the BKG
+      // style (CC BY 4.0, linking our attribution page), so only the imprint and privacy are added.
       attributionControl: {
         compact: true,
         customAttribution: [
-          `<a href="${STYLE_BASE}/attribution.html" target="_blank" rel="noopener noreferrer">Map style: basemap.world / BKG (CC BY 4.0), adapted by Graphmasters</a>`,
+          // MapLibre orders attributions by length, so these two lead the line.
           '<a href="https://www.graphmasters.net/imprint" target="_blank" rel="noopener noreferrer">Impressum</a>',
+          '<a href="#privacy">Privacy</a>', // opens the privacy dialog (main.ts)
         ],
       },
     })

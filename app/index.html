@@ -33,10 +33,7 @@
             downloaded from a National Access Point.
           </p>
           <p><button id="intro-pick" type="button" class="primary">Open file…</button></p>
-          <p class="muted">
-            The file is processed in your browser and is not uploaded. Only when you look up an OpenStreetMap road is its way id
-            sent to the OSM API; map tiles come from OpenFreeMap.
-          </p>
+          <p class="muted">The file is processed in your browser and is not uploaded.</p>
           <details>
             <summary>What it checks</summary>
             <ul>
@@ -80,6 +77,33 @@
 
       <aside id="inspector" class="pane inspector" aria-label="Inspector" aria-live="polite"></aside>
     </main>
+
+    <dialog id="privacy" class="privacy" aria-labelledby="privacy-title">
+      <h2 id="privacy-title">Privacy</h2>
+      <p>
+        The DATEX II file you open is read and analysed in your browser. It is not uploaded or stored. The viewer sets no
+        cookies, stores nothing in your browser and uses no analytics.
+      </p>
+      <p>To show the map and look up roads, your browser contacts these services directly. Like every web server, they see your IP address.</p>
+      <ul>
+        <li>GitHub Pages (<code>graphmasters.github.io</code>): the app and the map style.</li>
+        <li>
+          OpenFreeMap (<code>tiles.openfreemap.org</code>): map tiles. The map moves to your records and matching reads tiles along a
+          record, so these requests show roughly where your records are.
+        </li>
+        <li>BKG basemap.de (<code>sgx.geodatenzentrum.de</code>): fonts and map icons.</li>
+        <li>
+          OpenStreetMap API (<code>api.openstreetmap.org</code>) and Overpass (<code>overpass-api.de</code> by FOSSGIS e.V.,
+          <code>overpass.private.coffee</code>): when you select a road or a record is matched, an OpenStreetMap way id or a small
+          bounding box with a road class.
+        </li>
+      </ul>
+      <p>
+        No other data from your file is sent. The viewer is published by Graphmasters GmbH, see the
+        <a href="https://www.graphmasters.net/imprint" target="_blank" rel="noopener noreferrer">Impressum</a>.
+      </p>
+      <form method="dialog"><button type="submit" class="primary" autofocus>Close</button></form>
+    </dialog>
 
     <div class="dropzone" aria-hidden="true"><p>Drop the DATEX II file to analyse it</p></div>
     <script type="module" src="./main.ts"></script>
