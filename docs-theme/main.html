@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-
-{#- Code is highlighted at build time with Pygments, so no highlight.js is loaded (it would come
-    from cdnjs). The theme's darkmode.js switches the stylesheets with these ids between light and
-    dark mode, so the Pygments styles reuse them. -#}
-{%- block extrahead %}
-        <link id="hljs-light" rel="stylesheet" href="{{ 'css/pygments-light.css'|url }}">
-        <link id="hljs-dark" rel="stylesheet" href="{{ 'css/pygments-dark.css'|url }}" disabled>
-{%- endblock %}

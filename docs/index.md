@@ -4,8 +4,8 @@
 (NAPs) and links them to the road network, lane by lane. It runs entirely in your browser: open a
 feed to validate it, see its records on a map and compare them with OpenStreetMap.
 
-[Open the viewer](https://graphmasters.github.io/nap-roadworks-viewer/){ .btn .btn-primary }
-[Source code on GitHub](https://github.com/Graphmasters/nap-roadworks-viewer){ .btn .btn-outline-primary }
+[Open the viewer](https://graphmasters.github.io/nap-roadworks-viewer/){ .btn .btn-success }
+[Source code on GitHub](https://github.com/Graphmasters/nap-roadworks-viewer){ .btn .btn-neutral }
 
 ![NAP Roadworks Viewer: the record list on the left, a roadworks record drawn as a line on the map, and the Lanes tab comparing the DATEX II lane status (lane closed, foot and cycle paths closed, reversible lane) with the OpenStreetMap lane layout of the matched road](screenshot.webp)
 
