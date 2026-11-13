@@ -1,0 +1,92 @@
+# Documentation site, published at https://graphmasters.github.io/nap-roadworks-viewer/docs/.
+# The app occupies the root of the same GitHub Pages site, so the docs build into _site/docs/
+# after `npm run build:app` (Vite empties _site/ first). Preview: `mkdocs serve`.
+site_name: NAP Roadworks Viewer
+site_description: >-
+  Documentation of NAP Roadworks Viewer, an open-source browser tool that checks DATEX II roadworks
+  and road-closure feeds from National Access Points and links them to OpenStreetMap, lane by lane.
+site_url: https://graphmasters.github.io/nap-roadworks-viewer/docs/
+site_author: Graphmasters GmbH
+repo_url: https://github.com/Graphmasters/nap-roadworks-viewer
+repo_name: Graphmasters/nap-roadworks-viewer
+edit_uri: edit/main/docs/
+copyright: >-
+  © Graphmasters GmbH · Apache License 2.0 ·
+  <a href="https://www.graphmasters.net/imprint">Impressum</a>
+
+docs_dir: docs
+site_dir: _site/docs
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Getting a DATEX II file: get-data.md
+      - Using the viewer: usage.md
+  - What the viewer checks:
+      - Checks: checks.md
+      - Matching and lanes: matching-lanes.md
+      - Passability and contradictions: passability.md
+      - RTTI 5-Star ceilings: rtti.md
+  - About:
+      - Privacy: privacy.md
+      - Limitations: limitations.md
+      - Library and development: development.md
+      - Publications: publications.md
+      - References: references.md
+
+theme:
+  name: material
+  language: en
+  # System fonts: no request to Google Fonts.
+  font: false
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+validation:
+  links:
+    absolute_links: warn
+    unrecognized_links: warn
+    anchors: warn
