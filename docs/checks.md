@@ -31,8 +31,9 @@ Profile detection with heuristic rules for:
 - the German roadworks profile (MDM roadworks profile 04-00-00, *Baustellenprofil*), for example
   records without `laneStatusCoded` (`MDM-H01`) or traffic-management records without a
   `managedCause` link (`MDM-H02`);
-- Dutch situation feeds (DATEX II v3);
-- generic DATEX II v2 and v3.
+- Dutch situation feeds (DATEX II v3).
+
+Other feeds get a generic DATEX II v2 or v3 profile without profile-specific checks.
 
 They come from the profile documentation and observed feeds and are labelled as heuristics. They are
 no conformance test; use XSD validation for schema conformance.
@@ -51,7 +52,9 @@ lane status and location methods. Checks on this level include:
 |---|---|
 | `SEM-001`, `SEM-005` | Record id used twice in a situation, or in several situations |
 | `SEM-002`, `SEM-003`, `SEM-004` | End before start, record ended before the publication time, missing start time |
-| `LOC-001` … `LOC-003` | No drawable location; an approximate location (point coordinates or a display point, a zero-length `gmlLineString`, or a straight line through OpenLR points); location warnings, e.g. a `LinearElementByPoints` without a valid start or end point or with `fromPoint`/`toPoint` outside the element |
+| `LOC-001` | *Location not drawable*. The note says why, e.g. a location method the viewer does not decode (ALERT-C, TPEG, a coded linear element, an area, a point along a linear element, binary OpenLR), an OpenLR point or area location, an OpenLR line with fewer than two points, invalid WGS 84 points or all points at one position, a `LinearElementByPoints` in which no point has valid coordinates, or no location reference with coordinates at all |
+| `LOC-002` | *Approximate location*: point coordinates or a display point only, a straight line through OpenLR points, or a zero-length `gmlLineString` drawn as a point |
+| `LOC-003` | *Location warnings*, e.g. a `LinearElementByPoints` without a valid start or end point, or with `fromPoint`/`toPoint` outside the element |
 | `LOC-004` | `gmlLineString` positions read as "lon lat": one finding for the whole file, because the axis order is decided once per file (also raised when you set "lon lat" by hand) |
 | `LANE-001` … `LANE-003` | Unknown lane-status symbols, basic and extended lane status disagree, more lanes restricted than exist |
 | `REF-001` … `REF-003` | `managedCause` link not in the file, cyclic cause links, cause in another situation |
@@ -64,9 +67,9 @@ decoded: DATEX II v3 `openlrLinear` and `openlrPointLocationReference`, v2 `open
 `openlrExtendedPoint`. The inspector lists the location reference points with coordinates, FRC, form of
 way, bearing, lowest FRC to next point, distance to next point and offsets; the map marks them for the
 selected record. When a record has no `gmlLineString` or `LinearElementByPoints` line, the map draws
-one structured OpenLR line as straight segments between its points (see [Map](usage.md#map)). That line
-is marked approximate (`LOC-002`) and is also used for road matching. OpenLR point locations are only
-marked.
+one structured OpenLR line as straight segments between its points, if they are valid WGS 84 positions
+and not all at one position (see [Map](usage.md#map)). That line is marked approximate (`LOC-002`) and
+is also used for road matching. OpenLR point locations are only marked.
 
 The road classes (FRC, LFRCNP) are shown as published. What each FRC covers depends on the map data the
 publisher encoded against, so the viewer does not map them to OSM road classes; the inspector lists the
@@ -78,10 +81,14 @@ decimal degrees:
 | Rule | Checks |
 |---|---|
 | `OLR-001`, `OLR-002` | Latitude or longitude missing, not a number, 0/0 or not a WGS 84 position in decimal degrees (e.g. projected metres) |
-| `OLR-003` | Points that fit the record's other geometry (`gmlLineString`, `LinearElementByPoints` line or point coordinates) only with latitude and longitude swapped |
+| `OLR-003` | Points that fit the record's other geometry only with latitude and longitude swapped |
 | `OLR-004` | A point farther from the record's other geometry than the OpenLR path length (at least 15 km) plus 1 km |
-| `OLR-005` | Straight distance between points longer than the stated distance to the next point |
+| `OLR-005` | Straight distance between two points more than 10 % plus 50 m longer than the stated distance to the next point |
 | `OLR-006` | Incomplete or inconsistent reference |
+
+"Other geometry" is the line the map draws from the record's `gmlLineString` or, without one, from its
+`LinearElementByPoints` (cut to `fromPoint`/`toPoint`), plus the record's point coordinates and display
+points. A zero-length `gmlLineString` and the line through the OpenLR points never count.
 
 Binary OpenLR is detected, not decoded.
 

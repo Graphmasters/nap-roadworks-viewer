@@ -19,6 +19,6 @@ open-source NAP tools.
 
 The poster walks from a DATEX II file through the four steps
 [check, locate, interpret and routing hint](index.md#from-feed-to-road-in-four-steps), shows two cases
-from a published feed ([restricted is not closed](matching-lanes.md#example-restricted-is-not-closed)
+from a published feed ([restricted is not closed](matching-lanes.md#example-a-closed-cycle-path-is-not-a-closed-road)
 and [closed or not?](passability.md#dq-rw-001-closure-that-contradicts-its-cause)), and explains the
 [RTTI 5-Star ceilings](rtti.md#typical-problems-and-their-fixes) with typical problems and their fixes.

@@ -2,8 +2,9 @@
 
 Small, synthetic DATEX II files: the ids, places and values are invented. Download one and open it
 in [the viewer](https://graphmasters.github.io/nap-roadworks-viewer/) to see the checks at work
-without a real feed. The excerpts on this site are taken from these files, and a test makes sure each
-file still gives the results described here.
+without a real feed. The excerpts on this site are taken from these files. A test checks that each
+excerpt still matches its file and that each file still gives the main results described here:
+classification, routing action, how each line is drawn and the findings named.
 
 | File | DATEX II | Shows | Schema |
 |---|---|---|---|
@@ -12,8 +13,9 @@ file still gives the results described here.
 | [locations-v3.xml](examples/locations-v3.xml) | v3 | Three ways to locate a record: `gmlLineString`, `LinearElementByPoints`, OpenLR | valid against the DATEX II v3.5 schemas |
 
 The coordinates are invented, so the lines do not follow real roads, and road matching against
-OpenStreetMap may find nothing or an unrelated road. Everything else (report, record list, inspector,
-passability, RTTI panel) works as with a real feed.
+OpenStreetMap may find nothing or an unrelated road. The round coordinates also give a coarse
+resolution (about 56 m) in the RTTI panel. Everything else (report, record list, inspector,
+passability) works as with a real feed.
 
 ## Anatomy of a v2 file
 
@@ -54,15 +56,17 @@ a `linearExtension`:
 </groupOfLocations>
 ```
 
-`posList` holds latitude–longitude pairs ("lat lon", EPSG:4326). In the viewer, the record is
+`posList` holds latitude–longitude pairs ("lat lon"). The profile asks for ETRS89 coordinates and
+accepts WGS 84 (EPSG:4326); the two differ by about a metre, and the viewer reads both as WGS 84. In
+the viewer, the record is
 *restricted* with the routing action *do not block*: one of two lanes is closed in one direction.
 
 ## Locations in v3
 
 In DATEX II v3, the namespaces are split (`sit:` for situations, `loc:` for location referencing,
 `com:` for common types), and a record's location is a `sit:locationReference`. The three records of
-[locations-v3.xml](examples/locations-v3.xml) show the location methods the viewer
-[draws](usage.md#map), in its order of preference.
+[locations-v3.xml](examples/locations-v3.xml) show the first three location methods the viewer
+[draws](usage.md#map), in its order of preference. Each record carries only one of them.
 
 A **`gmlLineString`**, drawn as given:
 
@@ -75,7 +79,8 @@ A **`gmlLineString`**, drawn as given:
 </sit:locationReference>
 ```
 
-A **`LinearElementByPoints`**: a start point, intermediate points and an end point with coordinates.
+A **`LinearElementByPoints`**: a start point, optional intermediate points and an end point. Here each
+point has coordinates (`pointCoordinates`), which the viewer needs to draw it.
 The record covers the part from `fromPoint` to `toPoint`, here 50 m to 350 m along the points of a
 410 m element. The viewer draws exactly that part:
 

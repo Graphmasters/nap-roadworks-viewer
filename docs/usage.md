@@ -53,19 +53,21 @@ The map shows the records that pass the list filters. Each record is drawn from 
 has, in this order:
 
 1. a `gmlLineString`, drawn as a line;
-2. a `LinearElementByPoints`: a line through its points, cut to the section between its `fromPoint`
-   and `toPoint` (distances measured along the points);
+2. a `LinearElementByPoints` in a linear location (`linearWithinLinearElement`): a line through its
+   points, cut to the section between its `fromPoint` and `toPoint` (distances measured along the
+   points);
 3. a structured OpenLR line whose location reference points are all valid WGS 84 positions (the
-   `firstDirection` section when there are two): straight segments between its points, trimmed by its
-   offsets (scaled to that line; offsets that would leave nothing are ignored);
+   `firstDirection` section first; one of zero length is skipped): straight segments between its
+   points, trimmed by its offsets (scaled to that line; offsets that would leave nothing are ignored);
 4. a `gmlLineString` whose positions are all the same point, drawn as a point;
 5. point coordinates or a display point (`locationForDisplay`, `coordinatesForDisplay`), drawn as
-   points.
+   points. This includes the points of a `LinearElementByPoints` in a `pointAlongLinearElement`: the
+   viewer does not compute the point along the element.
 
 The Geometry row of the Record tab says which of these the drawn geometry comes from. It marks steps
 3–5 *approximate*: OpenLR carries no road shape between its points, so its line cuts corners. On the
 map, these look like any other line or point. OpenLR point locations are not drawn as lines. Records
-with other location methods are listed with the reason they are not drawn. The [location examples](examples.md#locations-in-v3)
+with nothing to draw are listed with the reason (`LOC-001`). The [location examples](examples.md#locations-in-v3)
 show the first three in XML.
 
 - **Select record** mode (default): click a record on the map to select it. A record drawn as a line

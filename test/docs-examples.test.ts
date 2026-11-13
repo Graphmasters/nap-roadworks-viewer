@@ -1,7 +1,8 @@
 /// <reference types="node" />
 // The XML examples in docs/examples/ are published with the documentation and quoted in its
-// pages. These tests keep them honest: each file must produce the results the pages describe, and
-// every excerpt a page marks with `<!-- example: <file> -->` must appear verbatim in that file.
+// pages. These tests keep them honest: each file must produce the main results the pages describe
+// (classification, routing action, how each line is drawn, the findings named), and every excerpt a
+// page marks with `<!-- example: <file> -->` must match whole lines of that file (indentation ignored).
 //
 // Schema validity is checked by hand, not here (the schemas are not part of the repository):
 // lane-closure-v2.xml against the MDM roadworks profile 04-00-00 XSD, extended-lane-status-v2.xml
@@ -43,32 +44,38 @@ describe('docs/examples', () => {
     expect(dq[0]!.recordIds).toEqual(['EX-3-C', 'EX-3-W'])
   })
 
-  it('locations-v3.xml: gmlLineString, LinearElementByPoints and OpenLR are drawn in that order of preference', async () => {
+  it('locations-v3.xml: each record is drawn from its own location method', async () => {
     const r = await load('locations-v3.xml')
     expect(r.meta.datexVersion).toBe('3')
     expect(event(r, 'EX-4-GML')).toMatchObject({ geometrySource: 'gmlLineString', geometryConfidence: 'direct' })
     const points = event(r, 'EX-4-POINTS')
     expect(points).toMatchObject({ geometrySource: 'linearElementByPoints', geometryConfidence: 'direct' })
-    expect(points.geometryNote).toContain('Cut to 50 m–350 m')
+    expect(points.geometryNote).toContain('Cut to 50 m–350 m of 410 m')
     const olr = event(r, 'EX-4-OPENLR')
     expect(olr).toMatchObject({ geometrySource: 'openlr', geometryConfidence: 'approximate' })
     expect(olr.openlr[0]!.lrps).toHaveLength(2)
+    expect(olr.geometryNote).toContain('Offsets 60 m / 60 m applied in proportion')
+    const loc002 = r.findings.filter((f) => f.ruleId === 'LOC-002').flatMap((f) => f.recordIds ?? [])
+    expect(loc002).toEqual(['EX-4-OPENLR'])
     // A line drawn from a LinearElementByPoints is not an RTTI polyline.
     const lin = r.findings.filter((f) => f.ruleId === 'RTTI-LIN-01').flatMap((f) => f.recordIds ?? [])
     expect(lin).toEqual(['EX-4-POINTS'])
   })
 
-  it('every example quoted in the docs appears verbatim in its file', () => {
+  it('every example quoted in the docs matches whole lines of its file', () => {
     const files = new Set(readdirSync(EXAMPLES))
-    const marker = /<!-- example: ([\w.-]+) -->\s*\n(\s*)```xml\n([\s\S]*?)\n\s*```/g
+    const marker = /<!-- example: ([\w.-]+) -->\s*\n\s*```xml\n([\s\S]*?)\n\s*```/g
+    const lines = (s: string) => s.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
     let quoted = 0
     for (const page of readdirSync(DOCS).filter((f) => f.endsWith('.md'))) {
       const md = readFileSync(join(DOCS, page), 'utf8')
-      for (const [, file, indent, body] of md.matchAll(marker)) {
+      const matches = [...md.matchAll(marker)]
+      // A marker whose block does not match the pattern would otherwise be skipped silently.
+      expect(matches.length, `${page}: every <!-- example: … --> marker needs a \`\`\`xml block`).toBe(md.split('<!-- example:').length - 1)
+      for (const [, file, body] of matches) {
         expect(files.has(file!), `${page} quotes missing ${file}`).toBe(true)
-        const lines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean)
-        const source = lines(readFileSync(join(EXAMPLES, file!), 'utf8')).join('\n')
-        const excerpt = lines(body!.replace(new RegExp(`^${indent}`, 'gm'), '')).join('\n')
+        const source = `\n${lines(readFileSync(join(EXAMPLES, file!), 'utf8')).join('\n')}\n`
+        const excerpt = `\n${lines(body!).join('\n')}\n`
         expect(source.includes(excerpt), `${page}: excerpt from ${file} does not match the file`).toBe(true)
         quoted++
       }

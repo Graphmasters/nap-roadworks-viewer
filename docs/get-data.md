@@ -70,13 +70,14 @@ feeds that need an account or are not public yet.
 For real schema validation, the viewer needs the XSD files of the DATEX II version or profile the feed
 uses. It downloads nothing by itself; you select the files ([how](usage.md#xsd-validation)).
 
-- **DATEX II schemas** for the versions and the standard parts are available from the
-  [DATEX II specifications](https://datex2.eu/specifications/) page; the full v3.x schemas are on the
-  download pages of [docs.datex2.eu](https://docs.datex2.eu/downloads/). For a v3 situation
-  publication, select `DATEXII_3_D2Payload.xsd` together with the files it imports.
+- **DATEX II schemas** of every version, v2.0 to v3.7, are on the
+  [download page of docs.datex2.eu](https://docs.datex2.eu/downloads/). The
+  [DATEX II specifications](https://datex2.eu/specifications/) page lists the parts of the standard.
+  For a v3 situation publication, select `DATEXII_3_D2Payload.xsd` together with the files it imports.
 - **National profiles** are published by their owners. For Germany, the roadworks profile
   (*Baustellenprofil*, MDM roadworks profile 04-00-00) can be downloaded from the
-  [Mobilithek download page](https://mobilithek.info/help/download). Feeds that add an
+  [Mobilithek download page](https://mobilithek.info/help/download): choose **Datenprofile**, then
+  *Datenmodell für Baustellen Version 04-00-00*. Feeds that add an
   `extendedLaneStatusCoded` ([Lanes](matching-lanes.md#lanes)) do not validate against it.
 - For real-time traffic information, the [DATEX II RTTI recommended reference profile](https://docs.datex2.eu/recommended-profiles/rrp/rtti/)
   describes which record types and value lists to use. The [RTTI 5-Star ceilings](rtti.md) refer to it.
@@ -88,7 +89,8 @@ The [XML examples](examples.md) were validated this way: `lane-closure-v2.xml` a
 roadworks profile, `locations-v3.xml` against the DATEX II v3.5 schemas.
 
 Independently of XSD validation, the viewer runs heuristic [profile checks](checks.md#profile-checks)
-for the German roadworks profile, Dutch situation feeds and generic DATEX II v2 and v3.
+for the German roadworks profile and Dutch situation feeds. Other feeds get a generic DATEX II v2 or v3
+profile without profile-specific checks.
 
 ## Licences and attribution
 

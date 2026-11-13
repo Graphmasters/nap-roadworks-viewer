@@ -61,7 +61,7 @@ and its built-in theme. `docs-theme/` adds the stylesheets for code highlighted 
 quotes must match its file.
 
 ```sh
-python3 -m venv .venv && . .venv/bin/activate
+python3.12 -m venv .venv && . .venv/bin/activate   # Python 3.11.5 or newer
 pip install -r requirements-docs.txt
 mkdocs serve           # http://127.0.0.1:8000/nap-roadworks-viewer/docs/
 mkdocs build --strict  # → _site/docs/

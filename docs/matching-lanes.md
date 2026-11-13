@@ -50,9 +50,11 @@ tags come from the OSM API. For merged features, the viewer looks up the clicked
 
 DATEX II can describe the lanes of a roadworks site precisely. The German roadworks profile (MDM
 roadworks profile 04-00-00) encodes the cross-section as a short string in `laneStatusCoded`, read
-across the road: lanes of the opposite direction first, then the separation, then the lanes of the
-direction of the record. Lowercase letters stand for lanes and hard shoulders, digits for the
-separation:
+across the road from left to right, seen in the direction of the record: the opposite carriageway
+first, then the separation, then the record's own carriageway. Where lanes cross over, a lane of the
+record's direction (`o`) can stand left of the central reservation. Lowercase letters stand for lanes,
+hard shoulders and hard-shoulder markings, the digits `1` and `2` for the separation between the
+directions:
 
 | Symbol | Meaning |
 |---|---|
@@ -61,7 +63,8 @@ separation:
 | `w` | Reversible lane, used in both directions |
 | `s` | Hard shoulder (a closed one is coded `x`, one open to traffic as a lane) |
 | `l` / `r` | Hard-shoulder separation, opposite direction / direction of the record |
-| `1` / `2` | Separation of a single carriageway / central reservation of a dual carriageway |
+| `1` | Separation between the directions on one carriageway: on minor roads, or a temporary one at motorway works |
+| `2` | Central reservation of a dual carriageway, kept in its original place when lanes cross over |
 
 A lane closure on a dual carriageway with hard shoulders, from
 [lane-closure-v2.xml](examples/lane-closure-v2.xml): two lanes open in the opposite direction, one of
@@ -81,8 +84,8 @@ two lanes closed in the direction of the record.
 ```
 
 Several German federal states publish an `extendedLaneStatusCoded` next to it. It uses the same
-alphabet plus uppercase symbols, for example `F` and `G` for a closed cycle path and foot path, and `H`
-and `P` for no-stopping zones. The element is not part of the published profile and has no public
+alphabet plus extra symbols for cycle paths, foot paths, parking and stopping, for example `F` and `G`
+for a closed cycle path and foot path, and `H` and `P` for no-stopping zones. The element is not part of the published profile and has no public
 documentation; the [lane-status-viewer encoding page](https://graphmasters.github.io/lane-status-viewer/docs.html)
 lists the symbols the viewer knows.
 
@@ -98,7 +101,7 @@ way on the map show the direction the OSM layout is drawn in; destination signs 
 When `laneStatusCoded` and `extendedLaneStatusCoded` disagree, the more restrictive reading counts.
 Unknown symbols are never read as open lanes.
 
-### Example: restricted is not closed
+### Example: a closed cycle path is not a closed road
 
 Cycle-path works on a single-carriageway road, from
 [extended-lane-status-v2.xml](examples/extended-lane-status-v2.xml). `laneStatusCoded` shows one open

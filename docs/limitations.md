@@ -12,15 +12,20 @@ What the viewer does not do should be as clear as what it does.
 ## Location referencing
 
 A `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in WGS 84 degrees is drawn as a line.
-A record without one is drawn from its `LinearElementByPoints`: a line through its points, cut to
-`fromPoint`/`toPoint`, with distances measured along the points. ALERT-C, TPEG and coded
-linear-element references are listed, not decoded. See [Map](usage.md#map) for the full order.
+A record without one is drawn from the `LinearElementByPoints` of a linear location: a line through
+its points, cut to `fromPoint`/`toPoint`, with distances measured along the points. A
+`LinearElementByPoints` in a `pointAlongLinearElement` is not drawn as a line, because the point along
+it is not computed; its points are drawn as points when the record has no line. ALERT-C, TPEG and coded linear-element references
+are listed, not decoded. See [Map](usage.md#map) for the full order.
 
 Structured OpenLR lines and points are decoded, and their points are marked for the selected record.
 OpenLR areas are only recognised. OpenLR carries no road shape between its points: a decoder finds the
 shortest path in its own map. The viewer has no such decoder, so a record with no other line is drawn
-as straight segments between the points of one OpenLR line, trimmed by its offsets. That line cuts
-corners, and road matching runs against it as it is. Binary OpenLR is not decoded.
+as straight segments between the points of one OpenLR line whose points are valid WGS 84 positions,
+trimmed by its offsets. That line cuts
+corners, and road matching runs against it as it is. The geometry is chosen before the checks run, so
+a record whose OpenLR fails `OLR-003` or `OLR-004` but has correct point coordinates is still drawn as
+the OpenLR line. Binary OpenLR is not decoded.
 
 OpenLR road classes (FRC, LFRCNP) are shown as published and not mapped to OSM road classes, because
 publishers define them against different map data.
