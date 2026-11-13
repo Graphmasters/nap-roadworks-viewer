@@ -73,8 +73,8 @@ function toLonLat(flat: number[], order: AxisOrder): Array<[number, number]> | u
 }
 
 /**
- * Straight line through the LRPs of the first usable structured OpenLR line reference, trimmed by
- * its offsets. OpenLR carries no road shape between LRPs (a decoder finds the shortest path in its
+ * Straight line through the LRPs of the first structured OpenLR line reference whose LRPs are valid
+ * WGS 84 positions, not all the same (firstDirection preferred), trimmed by its offsets. OpenLR carries no road shape between LRPs (a decoder finds the shortest path in its
  * own map, OpenLR white paper v1.5 §5.1), so this is only a chord. Offsets are metres along the
  * location reference path; they are scaled to the chord by DNP sum / chord length.
  */
@@ -82,8 +82,14 @@ export function openlrChord(refs: OpenlrReference[]): { coords: Array<[lon: numb
   const lines = refs
     .filter((r) => r.encoding === 'structured' && r.kind === 'line' && r.lrps.length >= 2 && r.lrps.every(validWgs84))
     .sort((a, b) => Number(b.role === 'firstDirection') - Number(a.role === 'firstDirection'))
-  const r = lines[0]
-  if (!r) return undefined
+  for (const r of lines) {
+    const chord = chordOf(r)
+    if (chord) return chord
+  }
+  return undefined
+}
+
+function chordOf(r: OpenlrReference): { coords: Array<[lon: number, lat: number]>; note: string } | undefined {
   const pts = r.lrps.map((p) => [p.lat!, p.lon!] as [number, number])
   const cum = [0]
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1]! + distanceM(pts[i - 1]![0], pts[i - 1]![1], pts[i]![0], pts[i]![1]))
@@ -183,10 +189,38 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
     return
   }
   event.geometryConfidence = 'none'
-  const other = event.locationMethods.filter((m) => !['gmlLineString', 'pointCoordinates', 'locationForDisplay', 'coordinatesForDisplay'].includes(m))
-  event.geometryNote = other.length
-    ? `Location uses ${other.join(', ')}, which this viewer does not decode. It is reported here but not drawn.`
-    : 'The record has no location reference with coordinates.'
+  event.geometryNote = undrawableNote(event, g)
+}
+
+/** Location methods whose absence of a drawing is explained per reference, not as "not decoded". */
+const EXPLAINED_METHODS = new Set(['gmlLineString', 'pointCoordinates', 'locationForDisplay', 'coordinatesForDisplay', 'OpenLR (structured)'])
+
+const VIEWER_LIMITATION = 'This is a limitation of the viewer, not an error in the feed.'
+
+/**
+ * Why a record has nothing to draw (LOC-001): location methods this viewer does not decode,
+ * structured OpenLR that is decoded but gives no line (a point or area location, or LRPs that are
+ * not valid WGS 84), or a LinearElementByPoints without valid coordinates.
+ */
+function undrawableNote(event: RoadEvent, g: PendingGeometry): string {
+  const limits = new Set<string>()
+  const errors = new Set<string>()
+  const byPoints = (g.elementsByPoints ?? 0) > 0
+  const notDecoded = event.locationMethods.filter((m) => !EXPLAINED_METHODS.has(m) && !(byPoints && m === 'linear element reference'))
+  if (notDecoded.length) limits.add(`Location uses ${notDecoded.join(', ')}, which this viewer does not decode. It is reported here but not drawn.`)
+  for (const r of event.openlr) {
+    if (r.encoding !== 'structured') continue
+    if (r.kind === 'point') limits.add('The OpenLR point location is decoded and its points are marked for the selected record, but the viewer derives no position from it.')
+    else if (r.kind === 'area') limits.add('The OpenLR area location is recognised but not decoded.')
+    else if (r.kind === 'unknown') limits.add('The OpenLR reference is of a type this viewer does not recognise.')
+    else if (r.lrps.length < 2) errors.add('The OpenLR line has fewer than two location reference points (OLR-006).')
+    else if (!r.lrps.every(validWgs84)) errors.add('The OpenLR line is not drawn because its location reference points are not valid WGS 84 positions (OLR-001, OLR-002).')
+    else errors.add('The OpenLR line is not drawn because all its location reference points are at the same position.')
+  }
+  // Drawn as a line or, from its pointCoordinates, as points whenever any of them is valid.
+  if (byPoints) errors.add('The LinearElementByPoints is decoded but has no start and end point with valid WGS 84 coordinates (see the location warnings).')
+  if (!limits.size && !errors.size) return `The record has no location reference with coordinates. ${VIEWER_LIMITATION}`
+  return [...limits, ...errors, ...(errors.size ? [] : [VIEWER_LIMITATION])].join(' ')
 }
 
 /** Distance in metres from a point to the nearest segment of a lon/lat polyline (local projection). */

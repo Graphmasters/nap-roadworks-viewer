@@ -47,6 +47,13 @@ export function feedChecks(meta: FeedMeta, situations: Situation[]): Finding[] {
   return out
 }
 
+/** LOC-002 message per geometry source of an approximate location. */
+const APPROXIMATE_MESSAGE: Record<string, string> = {
+  points: 'Approximate location: point coordinates only.',
+  openlr: 'Approximate location: straight line through OpenLR points.',
+  gmlLineString: 'Approximate location: zero-length gmlLineString drawn as a point.',
+}
+
 export function recordChecks(events: RoadEvent[], meta: FeedMeta, duplicateIds: Array<{ situationId: string; id: string }>): Finding[] {
   const out: Finding[] = []
   for (const d of duplicateIds)
@@ -116,7 +123,8 @@ export function recordChecks(events: RoadEvent[], meta: FeedMeta, duplicateIds: 
         severity: 'info',
         layer: 'location',
         message: 'No location that the viewer can draw.',
-        explanation: `${e.geometryNote ?? ''} This is a limitation of the viewer, not an error in the feed.`,
+        // The note says whether this is a limitation of the viewer or invalid data in the feed.
+        explanation: e.geometryNote,
         situationId: e.situationId,
         recordIds: [e.id],
         xmlPath: e.xmlPath,
@@ -126,7 +134,7 @@ export function recordChecks(events: RoadEvent[], meta: FeedMeta, duplicateIds: 
         ruleId: 'LOC-002',
         severity: 'info',
         layer: 'location',
-        message: 'Located by point coordinates only.',
+        message: APPROXIMATE_MESSAGE[e.geometrySource ?? ''] ?? 'Approximate location.',
         explanation: e.geometryNote,
         situationId: e.situationId,
         recordIds: [e.id],
@@ -181,10 +189,15 @@ export const OPENLR_MAX_DNP_M = 15_000
 
 const FRC_RE = /^FRC[0-7]$/
 
-/** Distance from (lat, lon) to the record's own non-OpenLR geometry; Infinity when it has none. */
+/**
+ * Distance from (lat, lon) to the record's own non-OpenLR geometry (gmlLineString or
+ * LinearElementByPoints line, point coordinates); Infinity when it has none. A line drawn through
+ * the OpenLR points themselves is skipped: it would always be at distance 0.
+ */
 function distanceToOwnGeometry(e: RoadEvent, lat: number, lon: number): number {
   let best = Infinity
-  for (const line of linesOf(e.geometry)) best = Math.min(best, distanceToLineM(lat, lon, line))
+  const ownLine = e.geometrySource === 'gmlLineString' || e.geometrySource === 'linearElementByPoints'
+  for (const line of ownLine ? linesOf(e.geometry) : []) best = Math.min(best, distanceToLineM(lat, lon, line))
   for (const [plat, plon] of e.referencePoints) best = Math.min(best, distanceM(lat, lon, plat, plon))
   return best
 }
