@@ -76,7 +76,7 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 | GitHub Pages | `graphmasters.github.io` | The app and its map style | Nothing from your file |
 | [OpenFreeMap](https://openfreemap.org/) | `tiles.openfreemap.org` | Map tiles; matching reads tiles along a record | Tile coordinates, so roughly where your records are |
 | [basemap.de](https://basemap.de/) (BKG) | `sgx.geodatenzentrum.de` | Fonts and map icons of the map style | Nothing from your file |
-| [OpenStreetMap API](https://wiki.openstreetmap.org/wiki/API_v0.6) | `api.openstreetmap.org` | Tags of a selected road; ways in a small box during matching | An OSM way id or a small bounding box |
+| [OpenStreetMap API](https://wiki.openstreetmap.org/wiki/API_v0.6) | `api.openstreetmap.org` | Tags of a selected road; ways in a small box during matching | An OSM way id, or a small bounding box around part of a record during matching |
 | [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) by [FOSSGIS e. V.](https://www.fossgis.de/) | `overpass-api.de` | Splitting merged map features into OSM ways during matching | A road class and the bounding box of part of a record |
 | Overpass API by [Private.coffee](https://private.coffee/) | `overpass.private.coffee` | Fallback for `overpass-api.de` | The same |
 
@@ -93,11 +93,10 @@ The main ones are below; the
 documentation has the full list.
 
 - **Location referencing.** Lines are drawn from `gmlLineString` (v2 `linearExtension`, v3
-  `LinearLocation`) in WGS 84 degrees and from a `LinearElementByPoints` in a linear location. In a
-  `pointAlongLinearElement` the point along the element is not computed, so its points are shown
-  as points. Structured OpenLR is decoded but not map-matched, so a record whose only line is
-  OpenLR is drawn as a straight line through its location reference points and marked
-  *approximate*. Binary OpenLR is detected, not decoded. ALERT-C, TPEG and coded linear-element references are listed, not decoded.
+  `LinearLocation`) in WGS 84 degrees and from `LinearElementByPoints`. OpenLR is not map-matched:
+  a record whose only line is OpenLR is drawn as an *approximate* straight line. Binary OpenLR is
+  detected, not decoded. ALERT-C, TPEG and coded linear-element references are listed, not
+  decoded. See *Location referencing and OpenLR* below. ALERT-C, TPEG and coded linear-element references are listed, not decoded.
 - **Axis order.** `posList` is read as "lat lon", as EPSG:4326 defines it. "lon lat" files are
   detected from explicit latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds and
@@ -160,8 +159,6 @@ FRCs are not mapped to OSM road classes, because publishers define them against 
 
 For the RTTI indicators, only `gmlLineString` and structured OpenLR count as polylines.
 
-The axis order of a file can be set by hand in the report when the automatic detection is wrong.
-
 </details>
 
 <details>
@@ -179,7 +176,7 @@ quality of the covered part (distance 0.3, direction 0.45, road number 0.15, cla
 by the share of the record within 25 m. Ways join the explaining sequence on quality (≥ 0.6), so
 several ways can share a long record. A merged tile feature ranks 0.1 lower than its score, so a
 single OSM way within that margin wins; a runner-up on the same road (within 3 m) does not make the
-match ambiguous. The score ranks candidates; it is not a calibrated probability.
+match ambiguous.
 
 **Splitting merged features.** When the best candidate is a merged tile feature, the viewer asks
 for the ways with the same `highway` value (from the tile's road class) inside the part of the
@@ -270,11 +267,12 @@ git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
 cd nap-roadworks-viewer
 npm ci
 npm run build    # library → dist/
-npm pack         # → graphmasters-nap-roadworks-viewer-0.1.0.tgz
+npm pack         # → graphmasters-nap-roadworks-viewer-<version>.tgz
 ```
 
 Install the archive in your project with
-`npm install /path/to/graphmasters-nap-roadworks-viewer-0.1.0.tgz`, then:
+`npm install /path/to/graphmasters-nap-roadworks-viewer-<version>.tgz`, using the file name that
+`npm pack` prints. Then:
 
 ```ts
 import { openAsBlob } from 'node:fs'
@@ -299,8 +297,9 @@ list.
 
 ## Development
 
-Requires Node.js 22.18 or later, as the build and test tools (tsup, Vitest) do; CI uses
-Node.js 24.
+Requires Node.js 22.18 or later in the 22 line, 24.11 or later in the 24 line, or 26 or later, as
+the build tool tsup does. `devEngines` in [`package.json`](package.json) states this range, so
+`npm ci` stops on other versions. CI uses Node.js 24.
 
 ```sh
 git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
@@ -334,14 +333,16 @@ from [lane-status-viewer](https://github.com/Graphmasters/lane-status-viewer).
 ### Tested feeds
 
 The repository contains no feed data; the tests use small, hand-written XML documents. An opt-in
-suite runs the checks against feeds you have downloaded yourself:
+suite runs the checks against two of the feeds below once you have downloaded them: it reads the
+newest `npt-hak-roadworks*.xml` in `hr/` and `svn-ncup-roadworks*.xml` in `si/` under
+`DATEX_SAMPLES_DIR`. The other feeds were checked by hand in the viewer.
 
 ```sh
 DATEX_SAMPLES_DIR="/path/to/feeds" npx vitest run test/samples.test.ts
 ```
 
 <details>
-<summary>National Access Points the checks were tried on, and the folder names the suite expects</summary>
+<summary>National Access Points the checks were tried on</summary>
 
 | Folder | Country | Publisher | DATEX II | NAP portal | Data |
 |---|---|---|---|---|---|
