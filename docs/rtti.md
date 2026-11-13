@@ -41,7 +41,7 @@ down and why, including the rule and message behind each internal contradiction.
 | Use of specification | Record types and value lists of the [DATEX II RTTI reference profile](https://docs.datex2.eu/recommended-profiles/rrp/rtti/); one encoding per category (`RTTI-SPEC-01/02`) | deviation 2★ |
 | Terminology & definition | Roadworks keep a lane open, closures close all lanes in a direction (`RTTI-TERM-01`, `DQ-RW-001/002`) | conflict 2★ |
 | Location referencing | Best method per record: OpenLR with valid WGS 84 points, ALERT-C, coordinates (`RTTI-LOC-01`) | 5★ / 4★ / 3★ (2★ for unplanned closures) / 0 |
-| Linear referencing | A polyline on every record: a `gmlLineString` with at least two distinct positions, or a structured OpenLR line whose points are valid WGS 84 positions at most 15 km apart (`RTTI-LIN-01/02/03`) | missing 0 |
+| Linear referencing | A polyline on every record: a `gmlLineString` with at least two distinct positions, or a structured OpenLR line with at least two points, all valid WGS 84 positions, no published distance to the next point above 15 km, and no invalid or swapped OpenLR coordinates on the record (`OLR-001/002/003`). A line drawn from a `LinearElementByPoints` does not count (`RTTI-LIN-01/02/03`) | missing 0 |
 | ↳ Direction | Only on records with a polyline: is the traffic direction along it unambiguous? (`RTTI-DIR-01/02/03`, see below) | not unambiguous 2★ |
 | Accuracy | Upper bound from coordinate resolution (`RTTI-ACC-01`); points far from their own polyline (`RTTI-ACC-02`) | per distance thresholds |
 | Correctness | Share of records without internal contradictions | per % thresholds |
@@ -69,6 +69,11 @@ contradiction (`RTTI-DIR-02`); references that disagree make it ambiguous (`RTTI
   roadworks cause, other record types. Static speed limits (Table 13) come via TN-ITS, not in a
   situation publication.
 - **Capability checks.** Schedules and vehicle classes count once the feed uses them anywhere.
+- **Which lines count as a polyline.** A `gmlLineString` with at least two distinct positions, else a
+  structured OpenLR line (its location reference points in order; offsets are not applied). A line the
+  map draws from a `LinearElementByPoints` does not count: a record with only that has no polyline
+  (`RTTI-LIN-01`). Polyline defects (`RTTI-LIN-02`) and points far from the polyline (`RTTI-ACC-02`) are
+  checked on a `gmlLineString` only.
 - **Polylines in other coordinate systems.** A `gmlLineString` in another CRS (e.g. `srsName="25833"`)
   counts as a polyline, but its direction and accuracy are not checked (`RTTI-LIN-03`).
 

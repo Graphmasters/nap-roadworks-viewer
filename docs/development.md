@@ -18,7 +18,8 @@ const result = await analyseDatex({ size: blob.size, stream: () => blob.stream()
 
 result.wellFormed                 // { ok: true } or the first error with line/column
 result.meta                       // version, publication type, namespaces, extensions, axis order
-result.events                     // normalised records (GeoJSON geometry, lanes, validity, …)
+result.events                     // normalised records (GeoJSON geometry with geometrySource and
+                                  // geometryConfidence, lanes, validity, …)
 result.findings                   // findings with rule id, severity, layer, xmlPath
 result.recordPassability          // per record: classification, routing action, reasons
 result.passability                // DQ-RW-001 / DQ-RW-002 findings with evidence and assumptions

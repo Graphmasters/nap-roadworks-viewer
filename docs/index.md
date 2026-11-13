@@ -10,7 +10,10 @@ feed to validate it, see its records on a map and compare them with OpenStreetMa
 ![NAP Roadworks Viewer: the record list on the left, a roadworks record drawn as a line on the map, and the Lanes tab comparing the DATEX II lane status (lane closed, foot and cycle paths closed, reversible lane) with the OpenStreetMap lane layout of the matched road](screenshot.webp)
 
 *A roadworks record from a German roadworks feed. The Lanes tab shows the DATEX II lane status next
-to the usual OpenStreetMap layout of the matched road, with a compass for its direction.*
+to the usual OpenStreetMap layout of the matched road, with a compass for its direction.
+Data: [Landesbetrieb Straßenbau und Verkehr Schleswig-Holstein (LBV.SH)](https://mobilithek.info/offers/110000000003237002)
+via Mobilithek, licence-free. Map: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
+(ODbL), OpenMapTiles, OpenFreeMap; map style basemap.world © BKG (CC BY 4.0), modified by Graphmasters.*
 
 ## A coordinate is not a closure
 

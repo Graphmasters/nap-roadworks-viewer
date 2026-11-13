@@ -49,14 +49,33 @@ Keyboard: ↑ / ↓ move through the list, Esc clears the selection.
 
 ## Map
 
-- Records with a line geometry (`gmlLineString`) are drawn as lines. Point-only records are drawn as
-  points marked *approximate*. Records with other location methods are listed with the reason they
-  are not drawn.
-- **Select record** mode (default): click a record on the map to select it.
+The map shows the records that pass the list filters. Each record is drawn from the best location it
+has, in this order:
+
+1. a `gmlLineString`, drawn as a line;
+2. a `LinearElementByPoints`: a line through its points, cut to the section between its `fromPoint`
+   and `toPoint` (distances measured along the points);
+3. a structured OpenLR line whose location reference points are all valid WGS 84 positions (the
+   `firstDirection` section when there are two): straight segments between its points, trimmed by its
+   offsets (scaled to that line; offsets that would leave nothing are ignored);
+4. a `gmlLineString` whose positions are all the same point, drawn as a point;
+5. point coordinates or a display point (`locationForDisplay`, `coordinatesForDisplay`), drawn as
+   points.
+
+The Geometry row of the Record tab says which of these the drawn geometry comes from. It marks steps
+3–5 *approximate*: OpenLR carries no road shape between its points, so its line cuts corners. On the
+map, these look like any other line or point. OpenLR point locations are not drawn as lines. Records
+with other location methods are listed with the reason they are not drawn.
+
+- **Select record** mode (default): click a record on the map to select it. A record drawn as a line
+  is matched to OSM roads by itself, and the best way is highlighted.
 - **Select OSM road** mode: click a road (zoom ≥ 14) to look it up in OpenStreetMap; its tags appear in
   the inspector.
-- For the selected record, a compass rose and arrows show the direction of the matched OSM way, and
-  OpenLR location reference points are marked when the record has structured OpenLR.
+- Arrows along the selected record show the order of its points. Arrows along the highlighted OSM way
+  show the direction it is shown in: the travel direction on a one-way road, otherwise the record's
+  direction when that is known. The compass rose in the Lanes and OSM tabs points the same way.
+- OpenLR location reference points are marked for the selected record: the first green, the last red,
+  joined by a dashed line in their order.
 
 The map position is kept in the URL (`#map=…`), so you can share a view. Nothing about your file is put
 in the URL.
@@ -65,7 +84,7 @@ in the URL.
 
 | Tab | Shows |
 |---|---|
-| **Record** | Type, validity, management types, cause links, situation with its other records, location methods, OpenLR points. |
+| **Record** | Type, validity, management types, cause links, situation with its other records, location methods, the drawn geometry with its source and confidence (*direct* or *approximate*), and OpenLR references: their points and road classes (FRC, LFRCNP) as published, with the OSM road class hierarchy for comparison. |
 | **QA** | Which [RTTI criteria](rtti.md) this record holds down and why, then every finding about the record. |
 | **XML** | The original XML of the record or of its whole situation, cut from the file. |
 | **Lanes** | DATEX II lane status next to the OSM lane layout of the matched way ([details](matching-lanes.md#lanes)). |

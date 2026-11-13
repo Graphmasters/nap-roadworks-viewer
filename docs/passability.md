@@ -34,8 +34,9 @@ no closed lane. The steps:
    `laneStatusCoded` and `extendedLaneStatusCoded` disagree, the more restrictive reading wins.
    Unknown codes never count as open lanes.
 3. Skip the finding when the validity periods do not overlap.
-4. If other records in the situation report a closure for the *same section* (lines overlap within
-   30 m) at an overlapping time, say so: the case needs review rather than correction.
+4. If other records in the situation report a closure for the *same section* (their drawn lines
+   overlap within 30 m) at an overlapping time, say so: the case needs review rather than correction.
+   A straight line through OpenLR points cuts corners, so this test is less reliable for it.
 
 **Example: closed or not?** A `roadClosed` record whose cause only carries the lane code `H2H`: no
 stopping on either side, no lane closed for driving. Both cannot be true at the same time. The viewer flags

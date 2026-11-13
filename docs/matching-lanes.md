@@ -17,6 +17,12 @@ When you select a record with a line, the viewer starts matching by itself:
    consecutive ways.
 4. The result is a match, *ambiguous* (the best candidates are too close) or *no match*.
 
+Matching works on whatever line the map draws for the record (see [Map](usage.md#map)). For a record
+whose only line is a straight line through OpenLR points, that line cuts corners where the road bends,
+and parts more than 25 m from a road add nothing to coverage. Scores drop, and the right road can be
+missed. The Matching tab does not warn about this; the Geometry row of the Record tab says the line
+comes from OpenLR.
+
 The Matching tab shows each candidate's components and, once loaded, its OSM lanes as a small graphic.
 The score ranks candidates; it is not a calibrated probability.
 
@@ -48,8 +54,9 @@ are open, narrowed, closed or reversible, whether the hard shoulder is in use, w
 parking is prohibited, and whether foot and cycle paths are closed.
 
 The **Lanes** tab turns these codes into lane diagrams and places them next to the lane layout of the
-matched OSM way, read from its lane tags. A compass rose and arrows on the map show the direction the
-OSM layout is drawn in; destination signs appear when the way has `destination:lanes`.
+matched OSM way, read from its lane tags. A compass rose next to the lane graphic and arrows along the
+way on the map show the direction the OSM layout is drawn in; destination signs appear when the way has
+`destination:lanes`.
 
 !!! info "A difference is a hint, not an error"
     OpenStreetMap describes the usual layout, DATEX II the temporary one. The direction mapping between
