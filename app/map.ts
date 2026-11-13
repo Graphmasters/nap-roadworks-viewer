@@ -103,6 +103,14 @@ const DIRECTION_LAYOUT = {
   'icon-allow-overlap': true,
   'icon-ignore-placement': true,
 } satisfies maplibregl.SymbolLayerSpecification['layout']
+/**
+ * Shorter wording for a source's attribution. Only filler words go; every credit, copyright and
+ * licence link stays as the style publishes it.
+ */
+export function shortenAttribution(html: string): string {
+  return html.replace(/Data from /g, '').replace(/Map style: /g, 'Style: ')
+}
+
 /** The selected record's decoded OpenLR location reference points. */
 const OPENLR = 'nrv-openlr'
 const OPENLR_COLOR = '#0f766e'
@@ -122,11 +130,25 @@ export class RoadworksMap {
       center: [9, 51.5],
       zoom: 4.5,
       hash: 'map',
+      // The style's own attribution credits OpenFreeMap, OpenMapTiles, OpenStreetMap and the BKG
+      // style (CC BY 4.0, linking our attribution page), so only the imprint and privacy are added.
+      transformStyle: (_previous, next) => ({
+        ...next,
+        sources: Object.fromEntries(
+          Object.entries(next.sources).map(([id, source]) => [
+            id,
+            'attribution' in source && typeof source.attribution === 'string'
+              ? { ...source, attribution: shortenAttribution(source.attribution) }
+              : source,
+          ]),
+        ),
+      }),
       attributionControl: {
         compact: true,
         customAttribution: [
-          `<a href="${STYLE_BASE}/attribution.html" target="_blank" rel="noopener noreferrer">Map style: basemap.world / BKG (CC BY 4.0), adapted by Graphmasters</a>`,
+          // MapLibre orders attributions by length, so these two lead the line.
           '<a href="https://www.graphmasters.net/imprint" target="_blank" rel="noopener noreferrer">Impressum</a>',
+          '<a href="#privacy">Privacy</a>', // opens the privacy dialog (main.ts)
         ],
       },
     })
