@@ -340,18 +340,23 @@ export const V2_URGENT = v2Doc(
   ),
 )
 
-/** A v2 `linearWithinLinearElement` with a LinearElementByPoints (DE-style), `fromPoint`/`toPoint` as given. */
-export function v2ByPoints(points: Array<[number, number]>, range = '', shuffle = false): string {
+/** A v2 `linearElement` of type LinearElementByPoints with referents S, M1…, E at the given points. */
+export function v2LinearElementByPoints(points: Array<[number, number]>, shuffle = false): string {
   const ref = (id: string, [lat, lon]: [number, number]) =>
     `<referentIdentifier>${id}</referentIdentifier><referentType>referenceMarker</referentType><pointCoordinates><latitude>${lat}</latitude><longitude>${lon}</longitude></pointCoordinates>`
   const mids = points.slice(1, -1).map((p, i) => `<intermediatePointOnLinearElement index="${i + 1}"><referent>${ref(`M${i + 1}`, p)}</referent></intermediatePointOnLinearElement>`)
   if (shuffle) mids.reverse()
-  return `
-          <linearExtension><extendedLinear><additonalLinearWithinLinearElement><methodName>ByPoints</methodName>
-            <linearWithinLinearElement><linearElement xsi:type="LinearElementByPoints"><roadName><values><value>Teststraße</value></values></roadName>
+  return `<linearElement xsi:type="LinearElementByPoints"><roadName><values><value>Teststraße</value></values></roadName>
               <startPointOfLinearElement>${ref('S', points[0]!)}</startPointOfLinearElement>${mids.join('')}
               <endPointOfLinearElement>${ref('E', points[points.length - 1]!)}</endPointOfLinearElement>
-            </linearElement>${range}</linearWithinLinearElement>
+            </linearElement>`
+}
+
+/** A v2 `linearWithinLinearElement` with a LinearElementByPoints (DE-style), `fromPoint`/`toPoint` as given. */
+export function v2ByPoints(points: Array<[number, number]>, range = '', shuffle = false): string {
+  return `
+          <linearExtension><extendedLinear><additonalLinearWithinLinearElement><methodName>ByPoints</methodName>
+            <linearWithinLinearElement>${v2LinearElementByPoints(points, shuffle)}${range}</linearWithinLinearElement>
           </additonalLinearWithinLinearElement></extendedLinear></linearExtension>`
 }
 
@@ -389,6 +394,45 @@ export const V2_BYPOINTS = v2Doc(
         200,
         200,
       ),
+    ),
+  ),
+)
+
+const POINT_45 = `
+          <pointByCoordinates><pointCoordinates><latitude>45.50003</latitude><longitude>16.00701</longitude></pointCoordinates></pointByCoordinates>`
+
+/**
+ * Records whose only line is OpenLR, next to a point (pointCoordinates). OLR-003/004 compare the
+ * OpenLR with the point, never with the straight line the map draws through the OpenLR itself.
+ */
+export const V2_OPENLR_POINTS = v2Doc(
+  v2Situation('OP-OK', v2Record('OP-OK-R', POINT_45 + v2OpenlrLine(v2Lrp(45.5, 15.999, 1150) + v2Lrp(45.5, 16.015, undefined, true)))),
+  v2Situation('OP-SWAP', v2Record('OP-SWAP-R', POINT_45 + v2OpenlrLine(v2Lrp(15.999, 45.5, 1150) + v2Lrp(16.015, 45.5, undefined, true)))),
+  // About 33 km north of the point; the OpenLR path is at most 15 km long.
+  v2Situation('OP-FAR', v2Record('OP-FAR-R', POINT_45 + v2OpenlrLine(v2Lrp(45.8, 15.999, 1150) + v2Lrp(45.8, 16.015, undefined, true)))),
+)
+
+/** Records drawn approximately (LOC-002) or not at all (LOC-001), each for another reason. */
+export const V2_LOCATION_KINDS = v2Doc(
+  v2Situation('K-PT', v2Record('K-PT-R', POINT_45)),
+  v2Situation('K-ZERO', v2Record('K-ZERO-R', `<linearExtension><linearExtended><gmlLineString><posList>45.5 16.0 45.5 16.0</posList></gmlLineString></linearExtended></linearExtension>`)),
+  v2Situation(
+    'K-OLRPT',
+    v2Record(
+      'K-OLRPT-R',
+      `<pointExtension><openlrExtendedPoint><openlrPointLocationReference><openlrPointAlongLine><openlrPositiveOffset>300</openlrPositiveOffset>${v2Lrp(45.6, 16.096, 900)}${v2Lrp(45.6, 16.108, undefined, true)}</openlrPointAlongLine></openlrPointLocationReference></openlrExtendedPoint></pointExtension>`,
+    ),
+  ),
+  v2Situation('K-AREA', v2Record('K-AREA-R', `<areaExtension><openlrAreaLocationReference><openlrCircleLocationReference><openlrRadius>500</openlrRadius></openlrCircleLocationReference></openlrAreaLocationReference></areaExtension>`)),
+  v2Situation('K-PROJ', v2Record('K-PROJ-R', v2OpenlrLine(v2Lrp(5432100, 612345, 1150) + v2Lrp(5432100, 613500, undefined, true)))),
+  // Projected metres instead of degrees: decoded, but nothing to draw.
+  v2Situation('K-BPPROJ', v2Record('K-BPPROJ-R', v2ByPoints([[5432100, 612345], [5432200, 612345]]))),
+  // A point 150 m along a LinearElementByPoints: not a line.
+  v2Situation(
+    'K-PAL',
+    v2Record(
+      'K-PAL-R',
+      `<pointAlongLinearElement>${v2LinearElementByPoints(BYPOINTS_SOUTH)}<distanceAlongLinearElement xsi:type="DistanceFromLinearElementStart"><distanceAlong>150</distanceAlong></distanceAlongLinearElement></pointAlongLinearElement>`,
     ),
   ),
 )
