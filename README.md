@@ -226,7 +226,7 @@ The repository contains no real feed data. Tests use small, hand-written XML doc
 
 Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party components and data
 credits are listed in [ATTRIBUTION.md](ATTRIBUTION.md). Map: © OpenStreetMap contributors (ODbL),
-OpenMapTiles, OpenFreeMap; style © BKG (CC BY 4.0), modified by Graphmasters
+OpenMapTiles, OpenFreeMap; map style basemap.world © BKG (CC BY 4.0), modified by Graphmasters
 ([basemap-world-openfreemap](https://github.com/Graphmasters/basemap-world-openfreemap)).
 
 When you publish screenshots or results from a DATEX II feed, credit its publisher as their
