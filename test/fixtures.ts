@@ -339,3 +339,56 @@ export const V2_URGENT = v2Doc(
         <urgentRoadworks>true</urgentRoadworks>`),
   ),
 )
+
+/** A v2 `linearWithinLinearElement` with a LinearElementByPoints (DE-style), `fromPoint`/`toPoint` as given. */
+export function v2ByPoints(points: Array<[number, number]>, range = '', shuffle = false): string {
+  const ref = (id: string, [lat, lon]: [number, number]) =>
+    `<referentIdentifier>${id}</referentIdentifier><referentType>referenceMarker</referentType><pointCoordinates><latitude>${lat}</latitude><longitude>${lon}</longitude></pointCoordinates>`
+  const mids = points.slice(1, -1).map((p, i) => `<intermediatePointOnLinearElement index="${i + 1}"><referent>${ref(`M${i + 1}`, p)}</referent></intermediatePointOnLinearElement>`)
+  if (shuffle) mids.reverse()
+  return `
+          <linearExtension><extendedLinear><additonalLinearWithinLinearElement><methodName>ByPoints</methodName>
+            <linearWithinLinearElement><linearElement xsi:type="LinearElementByPoints"><roadName><values><value>Teststraße</value></values></roadName>
+              <startPointOfLinearElement>${ref('S', points[0]!)}</startPointOfLinearElement>${mids.join('')}
+              <endPointOfLinearElement>${ref('E', points[points.length - 1]!)}</endPointOfLinearElement>
+            </linearElement>${range}</linearWithinLinearElement>
+          </additonalLinearWithinLinearElement></extendedLinear></linearExtension>`
+}
+
+/** Five points 0.0009° (about 100 m) apart, running south along 9.5° E. */
+export const BYPOINTS_SOUTH: Array<[number, number]> = [52.01, 52.0091, 52.0082, 52.0073, 52.0064].map((lat) => [lat, 9.5])
+
+export const fromTo = (from: string, to: string) => `
+              <fromPoint xsi:type="DistanceFromLinearElementStart"><distanceAlong>${from}</distanceAlong></fromPoint>
+              <toPoint xsi:type="DistanceFromLinearElementStart"><distanceAlong>${to}</distanceAlong></toPoint>`
+
+/** DE-style records: ByPoints plus OpenLR, ByPoints alone (uncut, percentage, referent), OpenLR alone. */
+export const V2_BYPOINTS = v2Doc(
+  v2Situation(
+    'BP-1',
+    v2Record(
+      'BP-1-R',
+      v2ByPoints(BYPOINTS_SOUTH, fromTo('0.0', '150.0'), true).replace(
+        '</extendedLinear>',
+        `</extendedLinear>${v2OpenlrLine(`<openlrLocationReferencePoint><openlrCoordinate><latitude>52.01</latitude><longitude>9.5</longitude></openlrCoordinate><openlrPathAttributes><openlrDistanceToNextLRPoint>400</openlrDistanceToNextLRPoint></openlrPathAttributes></openlrLocationReferencePoint><openlrLastLocationReferencePoint><openlrCoordinate><latitude>52.0064</latitude><longitude>9.5</longitude></openlrCoordinate></openlrLastLocationReferencePoint>`, 0, 250).replace(/<\/?linearExtension>/g, '')}`,
+      ),
+    ),
+    v2Record('BP-2-R', v2ByPoints(BYPOINTS_SOUTH)),
+    v2Record(
+      'BP-3-R',
+      v2ByPoints(
+        BYPOINTS_SOUTH,
+        `<fromPoint xsi:type="PercentageDistanceAlongLinearElement"><percentageDistanceAlong>50</percentageDistanceAlong></fromPoint>
+              <toPoint xsi:type="DistanceFromLinearElementReferent"><distanceAlong>50</distanceAlong><fromReferent><referentIdentifier>M1</referentIdentifier></fromReferent><towardsReferent><referentIdentifier>S</referentIdentifier></towardsReferent></toPoint>`,
+      ),
+    ),
+    v2Record(
+      'BP-4-R',
+      v2OpenlrLine(
+        `<openlrLocationReferencePoint><openlrCoordinate><latitude>52.01</latitude><longitude>9.5</longitude></openlrCoordinate><openlrPathAttributes><openlrDistanceToNextLRPoint>800</openlrDistanceToNextLRPoint></openlrPathAttributes></openlrLocationReferencePoint><openlrLastLocationReferencePoint><openlrCoordinate><latitude>52.0064</latitude><longitude>9.5</longitude></openlrCoordinate></openlrLastLocationReferencePoint>`,
+        200,
+        200,
+      ),
+    ),
+  ),
+)

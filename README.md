@@ -42,7 +42,7 @@ layout of the matched way, with a compass for its direction. Data: [Landesbetrie
 | **Record list** | Filters by record type (with counts), passability, location (on the map, not drawable, OpenLR present) and "active now", plus a free-text search over id, situation id, road number and name, description, record type and management types. Only visible rows are rendered, so feeds with 60,000+ records stay fast. ↑/↓ moves through the list, Esc clears the selection. |
 | **Inspector** | Tabs Record, QA, XML (original XML of the record or its situation), Lanes, Matching and OSM (tags linked to the OSM wiki). Findings in the report and the RTTI panel jump to the record and open the right tab. |
 | **Interface** | Map clicks select a record or an OSM road. The map position is kept in the URL (`#map=…`); nothing about the file is. Dark mode follows the system setting, motion is reduced on request, and below 900 px the layout switches between Feed, Map and Inspector. A progress bar shows bytes, situations and records while a file loads. The map credits link to the Impressum and to a Privacy dialog that lists every service the browser contacts. |
-| **Map** | Records with `gmlLineString` drawn as lines; point-only records as points marked *approximate*; other location methods listed with a reason. |
+| **Map** | Lines, in order of preference: `gmlLineString`; the points of a `LinearElementByPoints`, cut to its `fromPoint`/`toPoint`; a straight line through structured OpenLR location reference points (*approximate*). Point-only records as points marked *approximate*; other location methods listed with a reason. The inspector reports OpenLR road classes (FRC, LFRCNP) as published, next to the OSM road class hierarchy for comparison. |
 | **OSM lookup** | Click a road (zoom ≥ 14): the vector-tile feature id gives the OSM way, and its tags come from the OSM API. |
 | **Matching** | Scores OSM road candidates against a record line: score = coverage × quality (distance, direction, road number, class), so candidates that explain more of the record win. Shows the components and, once loaded, each way's OSM lanes as a tiny graphic; reports *ambiguous* or *no match*. Single OSM ways are preferred over merged tile features unless those are clearly better; a merged feature that still wins is split into its OSM ways and scored again. |
 | **Lanes** | `laneStatusCoded` / `extendedLaneStatusCoded` diagrams (lane-status-viewer) next to the OSM lane layout (osm-lanes), with quality indicators. A compass rose and arrows on the map show the way direction the OSM layout is drawn in; destination signs appear when the way has `destination:lanes`. |
@@ -133,10 +133,16 @@ repository contains no feed data. The folder names are those `test/samples.test.
 
 ## Limitations
 
-- **Location referencing.** Only `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in
-  WGS 84 degrees is drawn as a line. AlertC, TPEG and linear-element references are listed, not
-  decoded. Structured OpenLR is decoded and its points are marked for the selected record, but OpenLR
-  is not map-matched into a line; binary OpenLR is not decoded.
+- **Location referencing.** `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in WGS 84
+  degrees and `LinearElementByPoints` (cut to `fromPoint`/`toPoint`, distances measured along its
+  points) are drawn as lines. AlertC, TPEG and coded linear-element references are listed, not
+  decoded. Structured OpenLR is decoded and its points are marked for the selected record. OpenLR
+  carries no road shape between its points (a decoder finds the shortest path in its own map,
+  OpenLR white paper v1.5 §5.1), and this viewer does not map-match it, so a record whose only line
+  is OpenLR is drawn as a straight line through its points, trimmed by its offsets. FRCs are not
+  mapped to OSM road classes, because publishers define them against different map data. Binary
+  OpenLR is not decoded. Only `gmlLineString` counts as a polyline for the RTTI indicators (besides
+  OpenLR, as before).
   The `posList` axis order is "lat lon" per EPSG:4326. "lon lat" files are detected from explicit
   latitude/longitude points of the same records, or can be set by hand.
 - **Profile checks are heuristic.** They come from the profile documentation and observed feeds. They

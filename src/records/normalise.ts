@@ -3,6 +3,7 @@
 
 import type { LaneCode, LaneDetail, LaneImpact, RestrictionType, RoadEvent, Situation, TypeBasis } from '../model'
 import { laneEvidenceOf, laneStatesFromCode } from '../lanes/codes'
+import { linearElementLines, type LinearElementLine } from '../location/linear-element'
 import { decodeOpenlr } from '../location/openlr'
 import {
   child,
@@ -60,6 +61,8 @@ export const DISPLAY_POINT_ELEMENTS = ['locationForDisplay', 'coordinatesForDisp
 /** Raw coordinates kept until the file-wide axis order is known. */
 export interface PendingGeometry {
   lines: number[][]
+  /** LinearElementByPoints polylines, cut to their fromPoint/toPoint (explicit lat/lon). */
+  elementLines: LinearElementLine[]
   /** Points with explicit latitude/longitude elements (unambiguous axis order). */
   points: Array<[lat: number, lon: number]>
   /** True when `points` come only from display points (`locationForDisplay`, `coordinatesForDisplay`). */
@@ -266,7 +269,7 @@ function normaliseRecord(
     const m = LOCATION_METHODS[e.local]
     if (m) methods.add(m)
   }
-  const geometry = collectGeometry(location, warnings)
+  const geometry = collectGeometry(location, [])
   const openlr = decodeOpenlr(location, basePath)
   if (openlr.some((r) => r.encoding === 'structured')) methods.add('OpenLR (structured)')
   if (openlr.some((r) => r.encoding === 'binary')) methods.add('OpenLR (binary)')
@@ -387,5 +390,6 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
       if (lat !== undefined && lon !== undefined) points.push([lat, lon])
     }
   }
-  return { lines, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+  const elementLines = linearElementLines(location, warnings)
+  return { lines, elementLines, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
 }
