@@ -14,13 +14,19 @@ import './style.css'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
 const fileInput = $<HTMLInputElement>('file')
+const progress = $('progress')
+const progressBar = $('progress-bar')
+const progressText = $('progress-text')
+const urlOpen = $<HTMLButtonElement>('url-open')
+const urlDialog = $<HTMLDialogElement>('url-dialog')
 const urlForm = $<HTMLFormElement>('url-form')
 const urlInput = $<HTMLInputElement>('url-input')
 const urlError = $('url-error')
-const progress = $('progress')
-const progressTrack = $('progress-track')
-const progressBar = $('progress-bar')
-const progressText = $('progress-text')
+const urlCancel = $<HTMLButtonElement>('url-cancel')
+const urlSubmit = $<HTMLButtonElement>('url-submit')
+const urlProgress = $('url-progress')
+const urlProgressBar = $('url-progress-bar')
+const urlProgressText = $('url-progress-text')
 const reportEl = $('report')
 const rttiEl = $('rtti')
 const inspectorEl = $('inspector')
@@ -37,6 +43,9 @@ let xsd: XsdState = { status: 'none' }
 let idIndex = new Map<string, number>()
 let visible: Set<number> | undefined
 let urlAbort: AbortController | undefined
+/** A URL load is downloading (it can be cancelled), reading (the dialog waits for the result) or idle. */
+type UrlStage = 'idle' | 'downloading' | 'reading'
+let urlStage: UrlStage = 'idle'
 
 const state: InspectorState = { result: null, index: null, tab: 'record', xml: { status: 'idle' }, way: { status: 'idle' }, match: { status: 'idle' }, orientation: 0, wayReversed: false }
 
@@ -49,18 +58,16 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
   const m = ev.data
   if (m.type === 'progress') {
     const pct = m.totalBytes ? Math.min(100, (m.bytesRead / m.totalBytes) * 100) : 0
-    progressBar.style.width = `${pct.toFixed(1)}%`
-    progressText.textContent = `${formatBytes(m.bytesRead)} of ${formatBytes(m.totalBytes)} read · ${m.situations.toLocaleString('en')} situations · ${m.records.toLocaleString('en')} records`
+    const view = loadView()
+    view.bar.style.width = `${pct.toFixed(1)}%`
+    view.text.textContent = `${formatBytes(m.bytesRead)} of ${formatBytes(m.totalBytes)} read · ${m.situations.toLocaleString('en')} situations · ${m.records.toLocaleString('en')} records`
   } else if (m.type === 'result') onResult(m.result)
   else if (m.type === 'extracted') pending.get(m.requestId)?.resolve(m.text)
   else if (m.type === 'decompressed') pending.get(m.requestId)?.resolve(m.bytes)
   else if (m.type === 'error') {
     for (const p of pending.values()) p.reject(new Error(m.message))
     pending.clear()
-    if (!result) {
-      progress.hidden = false
-      progressText.textContent = `Could not read the file: ${m.message}`
-    }
+    if (!result) showLoadError(`Could not read the file: ${m.message}`)
   }
 }
 
@@ -106,13 +113,30 @@ const records = new RecordList(
 )
 
 // ------------------------------------------------------------------------------------------ load
+/** A file from the file picker or dropped on the page. It replaces a URL load that is still open. */
 function loadFile(f: File) {
-  urlAbort?.abort() // a file chosen while a URL downloads replaces that download
-  setUrlError(null)
+  stopUrlLoad()
+  openFile(f)
+}
+
+function openFile(f: File) {
   file = f
   axisOverride = undefined
   profileOverride = undefined
   analyse()
+}
+
+/** Where the progress of the current load goes: the URL dialog while it is open, otherwise the feed pane. */
+function loadView() {
+  return urlDialog.open ? { box: urlProgress, bar: urlProgressBar, text: urlProgressText } : { box: progress, bar: progressBar, text: progressText }
+}
+
+function showLoadError(message: string) {
+  if (urlDialog.open) showUrlError(message)
+  else {
+    progress.hidden = false
+    progressText.textContent = message
+  }
 }
 
 function analyse() {
@@ -122,10 +146,11 @@ function analyse() {
   clearTimeout(autoMatch)
   Object.assign(state, { result: null, index: null, xml: { status: 'idle' }, match: { status: 'idle' } })
   intro.hidden = true
-  progress.hidden = false
-  progressTrack.hidden = false
-  progressBar.style.width = '0%'
-  progressText.textContent = `Reading ${file.name}…`
+  const view = loadView()
+  view.box.hidden = false
+  view.box.classList.remove('indeterminate')
+  view.bar.style.width = '0%'
+  view.text.textContent = `Reading ${file.name}…`
   reportEl.replaceChildren()
   rttiEl.replaceChildren()
   records.setResult(null)
@@ -138,6 +163,10 @@ function onResult(r: AnalysisResult) {
   result = r
   idIndex = new Map(r.events.map((e, i) => [e.id, i]))
   progress.hidden = true
+  if (urlStage === 'reading') {
+    setUrlStage('idle')
+    urlDialog.close() // the feed has loaded, so the dialog is done
+  }
   state.result = r
   renderReportPanel()
   records.setResult(r)
@@ -408,68 +437,114 @@ $('pick').addEventListener('click', () => fileInput.click())
 $('intro-pick').addEventListener('click', () => fileInput.click())
 
 // ------------------------------------------------------------------------------------ URL input
+urlOpen.addEventListener('click', () => {
+  if (!urlDialog.open) urlDialog.showModal()
+  urlInput.focus()
+})
+
+urlCancel.addEventListener('click', () => urlDialog.close())
+
 urlForm.addEventListener('submit', (e) => {
   e.preventDefault()
   let url: URL
   try {
     url = new URL(urlInput.value.trim())
   } catch {
-    setUrlError('Enter the complete address, starting with https://')
+    showUrlError('Enter the complete address, starting with https://')
     return
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    setUrlError('Only http:// and https:// addresses can be opened.')
+    showUrlError('Only http:// and https:// addresses can be opened.')
     return
   }
   void loadUrl(url)
 })
 
-function setUrlError(message: string | null) {
-  urlError.hidden = !message
-  urlError.textContent = message ?? ''
+// Escape cancels a download. Once the file is being read, the dialog stays open until the feed has loaded or has failed.
+urlDialog.addEventListener('cancel', (e) => {
+  if (urlStage === 'reading') e.preventDefault()
+})
+
+urlDialog.addEventListener('close', () => {
+  if (urlStage === 'downloading') urlAbort?.abort()
+  setUrlStage('idle')
+  urlProgress.hidden = true
+  clearUrlError()
+})
+
+/** Ends a URL load that is still downloading and closes the dialog. */
+function stopUrlLoad() {
+  urlAbort?.abort()
+  setUrlStage('idle')
+  if (urlDialog.open) urlDialog.close()
+}
+
+/** The form is open for input while idle; a download can be cancelled, a file being read cannot. */
+function setUrlStage(stage: UrlStage) {
+  urlStage = stage
+  urlInput.disabled = stage !== 'idle'
+  urlSubmit.disabled = stage !== 'idle'
+  urlCancel.disabled = stage === 'reading'
+}
+
+function showUrlError(message: string) {
+  setUrlStage('idle')
+  urlProgress.hidden = true
+  urlError.textContent = message
+  urlError.hidden = false
+}
+
+function clearUrlError() {
+  urlError.hidden = true
+  urlError.textContent = ''
+}
+
+function showUrlProgress(text: string) {
+  urlProgress.hidden = false
+  urlProgress.classList.add('indeterminate') // the size is not known while the body downloads
+  urlProgressBar.style.width = '0%'
+  urlProgressText.textContent = text
 }
 
 /**
- * Downloads a feed with the browser and analyses it like a dropped file. A server that does not allow
+ * Downloads a feed with the browser and analyses it like a dropped file. The dialog shows the download and the
+ * analysis, and stays open until the feed has loaded or the error is shown in it. A server that does not allow
  * cross-origin requests makes fetch fail without a status, so that failure is reported as a likely CORS problem.
  */
 async function loadUrl(url: URL) {
   urlAbort?.abort()
   const ac = (urlAbort = new AbortController())
   const name = fileNameOf(url)
-  setUrlError(null)
-  progress.hidden = false
-  progressTrack.hidden = true // No total: a compressed transfer reports only its compressed length, so the bar would be wrong
-  progressText.textContent = `Downloading ${name} from ${url.host}…`
+  clearUrlError()
+  setUrlStage('downloading')
+  showUrlProgress(`Downloading ${name} from ${url.host}…`)
 
   let response: Response
   try {
     response = await fetch(url, { cache: 'no-cache', signal: ac.signal })
   } catch {
     if (ac.signal.aborted) return
-    progress.hidden = true
-    setUrlError(`Could not download from ${url.host}. The server may not allow requests from other websites (CORS) or may be unreachable. Download the file and drop it here instead.`)
+    showUrlError(`Could not download from ${url.host}. The server may not allow requests from other websites (CORS) or may be unreachable. Download the file and drop it onto the page instead.`)
     return
   }
   if (!response.ok) {
-    progress.hidden = true
-    setUrlError(`${url.host} answered ${response.status} ${response.statusText}.`)
+    showUrlError(`${url.host} answered ${response.status} ${response.statusText}.`)
     return
   }
 
   let blob: Blob
   try {
     blob = await readBlob(response, (bytes) => {
-      if (!ac.signal.aborted) progressText.textContent = `Downloading ${name}: ${formatBytes(bytes)}`
+      if (!ac.signal.aborted) urlProgressText.textContent = `Downloading ${name}: ${formatBytes(bytes)}`
     })
   } catch (err) {
     if (ac.signal.aborted) return
-    progress.hidden = true
-    setUrlError(`The download from ${url.host} was interrupted: ${(err as Error).message}`)
+    showUrlError(`The download from ${url.host} was interrupted: ${(err as Error).message}`)
     return
   }
   if (ac.signal.aborted) return
-  loadFile(new File([blob], name, { type: blob.type }))
+  setUrlStage('reading')
+  openFile(new File([blob], name, { type: blob.type }))
 }
 
 /** Reads the body in chunks, so the progress shows while a large feed downloads. */
@@ -538,7 +613,7 @@ document.addEventListener('click', (e) => {
 })
 
 window.addEventListener('keydown', (e) => {
-  if (privacyDialog.open) return // Esc closes the dialog, not the selection.
+  if (privacyDialog.open || urlDialog.open) return // Esc closes the dialog, not the selection.
   if (e.key === 'Escape' && state.index !== null && !(e.target instanceof HTMLInputElement)) select(null, false)
 })
 

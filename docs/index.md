@@ -58,7 +58,7 @@ file allows: see [RTTI 5-Star ceilings](rtti.md).
 
 1. [Download a DATEX II roadworks file](get-data.md) from your National Access Point.
 2. Open [graphmasters.github.io/nap-roadworks-viewer](https://graphmasters.github.io/nap-roadworks-viewer/).
-3. Drop the file into the window, or use **Open DATEX II file…** (plain XML or gzip). Or paste the file's URL in the top bar and click **Open URL**.
+3. Drop the file into the window, or use **Open DATEX II file…** (plain XML or gzip). Or choose **Open URL…** in the top bar and paste the file's address.
 
 Then follow [Using the viewer](usage.md). No file at hand? The [XML examples](examples.md) are small
 synthetic files you can open right away. Which checks do you need for your feed? Issues and pull
