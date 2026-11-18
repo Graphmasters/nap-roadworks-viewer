@@ -9,6 +9,9 @@ The DATEX II file you open is read and analysed in your browser, in a Web Worker
 nor stored. The viewer sets no cookies, stores nothing in your browser and uses no analytics. That
 matters for feeds that need an account or are not public yet.
 
+If you open a file by its URL, your browser downloads it directly from that host, which sees your IP
+address like any download. The host must allow cross-origin requests for the viewer to read the file.
+
 ## What the browser loads from the internet
 
 To show the map and look up roads, your browser contacts these services directly. Like every web

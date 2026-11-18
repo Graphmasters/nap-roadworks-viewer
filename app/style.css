@@ -70,7 +70,8 @@ code {
 
 button,
 select,
-input[type='search'] {
+input[type='search'],
+input[type='url'] {
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -146,6 +147,27 @@ button.linkish {
 .topbar h1 {
   font-size: 16px;
   margin: 0 8px 0 0;
+}
+
+.url-form {
+  display: flex;
+  flex: 1 1 280px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 560px;
+}
+
+.url-form input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.url-error {
+  flex: 0 0 100%;
+  margin: 0;
+  font-size: 12px;
 }
 
 .modes,

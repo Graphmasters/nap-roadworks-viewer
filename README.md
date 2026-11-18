@@ -54,7 +54,9 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 1. Download a DATEX II roadworks or closure publication (v2 or v3) from a National Access Point.
    Plain XML and gzip both work, also when a gzip file is saved as `.xml`.
 2. Open **<https://graphmasters.github.io/nap-roadworks-viewer/>** and drop the file onto the
-   page, or choose **Open DATEX II file…**.
+   page, choose **Open DATEX II file…**, or paste the file's URL into the top bar and choose
+   **Open URL**. The browser downloads the file from that address, so the server must allow
+   cross-origin requests (CORS).
 3. Read the **Report** and **RTTI 5-Star** sections, then pick a record from the list or on the
    map. The inspector shows its details.
 4. Optional: to validate against the schema, choose **Validate against XSD files…** in the report
@@ -64,7 +66,8 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 ## Privacy
 
 - **Your file stays on your device.** The browser reads and analyses it in a Web Worker. It is not
-  uploaded or stored.
+  uploaded or stored. If you open a file by URL, your browser downloads it from that host directly,
+  which sees your IP address like any download.
 - **No backend.** The app is a set of static files served from GitHub Pages. It uses no
   Graphmasters servers, sets no cookies, stores nothing in your browser and has no analytics.
 - **External services.** To show the map and look up roads, your browser contacts the services

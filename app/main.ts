@@ -14,7 +14,11 @@ import './style.css'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
 const fileInput = $<HTMLInputElement>('file')
+const urlForm = $<HTMLFormElement>('url-form')
+const urlInput = $<HTMLInputElement>('url-input')
+const urlError = $('url-error')
 const progress = $('progress')
+const progressTrack = $('progress-track')
 const progressBar = $('progress-bar')
 const progressText = $('progress-text')
 const reportEl = $('report')
@@ -32,6 +36,7 @@ let profileOverride: string | undefined
 let xsd: XsdState = { status: 'none' }
 let idIndex = new Map<string, number>()
 let visible: Set<number> | undefined
+let urlAbort: AbortController | undefined
 
 const state: InspectorState = { result: null, index: null, tab: 'record', xml: { status: 'idle' }, way: { status: 'idle' }, match: { status: 'idle' }, orientation: 0, wayReversed: false }
 
@@ -102,6 +107,8 @@ const records = new RecordList(
 
 // ------------------------------------------------------------------------------------------ load
 function loadFile(f: File) {
+  urlAbort?.abort() // a file chosen while a URL downloads replaces that download
+  setUrlError(null)
   file = f
   axisOverride = undefined
   profileOverride = undefined
@@ -116,6 +123,7 @@ function analyse() {
   Object.assign(state, { result: null, index: null, xml: { status: 'idle' }, match: { status: 'idle' } })
   intro.hidden = true
   progress.hidden = false
+  progressTrack.hidden = false
   progressBar.style.width = '0%'
   progressText.textContent = `Reading ${file.name}…`
   reportEl.replaceChildren()
@@ -398,6 +406,97 @@ fileInput.addEventListener('change', () => {
 })
 $('pick').addEventListener('click', () => fileInput.click())
 $('intro-pick').addEventListener('click', () => fileInput.click())
+
+// ------------------------------------------------------------------------------------ URL input
+urlForm.addEventListener('submit', (e) => {
+  e.preventDefault()
+  let url: URL
+  try {
+    url = new URL(urlInput.value.trim())
+  } catch {
+    setUrlError('Enter the complete address, starting with https://')
+    return
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    setUrlError('Only http:// and https:// addresses can be opened.')
+    return
+  }
+  void loadUrl(url)
+})
+
+function setUrlError(message: string | null) {
+  urlError.hidden = !message
+  urlError.textContent = message ?? ''
+}
+
+/**
+ * Downloads a feed with the browser and analyses it like a dropped file. A server that does not allow
+ * cross-origin requests makes fetch fail without a status, so that failure is reported as a likely CORS problem.
+ */
+async function loadUrl(url: URL) {
+  urlAbort?.abort()
+  const ac = (urlAbort = new AbortController())
+  const name = fileNameOf(url)
+  setUrlError(null)
+  progress.hidden = false
+  progressTrack.hidden = true // No total: a compressed transfer reports only its compressed length, so the bar would be wrong
+  progressText.textContent = `Downloading ${name} from ${url.host}…`
+
+  let response: Response
+  try {
+    response = await fetch(url, { cache: 'no-cache', signal: ac.signal })
+  } catch {
+    if (ac.signal.aborted) return
+    progress.hidden = true
+    setUrlError(`Could not download from ${url.host}. The server may not allow requests from other websites (CORS) or may be unreachable. Download the file and drop it here instead.`)
+    return
+  }
+  if (!response.ok) {
+    progress.hidden = true
+    setUrlError(`${url.host} answered ${response.status} ${response.statusText}.`)
+    return
+  }
+
+  let blob: Blob
+  try {
+    blob = await readBlob(response, (bytes) => {
+      if (!ac.signal.aborted) progressText.textContent = `Downloading ${name}: ${formatBytes(bytes)}`
+    })
+  } catch (err) {
+    if (ac.signal.aborted) return
+    progress.hidden = true
+    setUrlError(`The download from ${url.host} was interrupted: ${(err as Error).message}`)
+    return
+  }
+  if (ac.signal.aborted) return
+  loadFile(new File([blob], name, { type: blob.type }))
+}
+
+/** Reads the body in chunks, so the progress shows while a large feed downloads. */
+async function readBlob(response: Response, onBytes: (bytes: number) => void): Promise<Blob> {
+  const reader = response.body?.getReader()
+  if (!reader) return response.blob()
+  const parts: BlobPart[] = []
+  let bytes = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    parts.push(value)
+    bytes += value.byteLength
+    onBytes(bytes)
+  }
+  return new Blob(parts, { type: response.headers.get('content-type') ?? '' })
+}
+
+/** The last path segment of the URL, which becomes the file name shown in the report. */
+function fileNameOf(url: URL): string {
+  const segment = url.pathname.split('/').pop() ?? ''
+  try {
+    return decodeURIComponent(segment) || url.hostname
+  } catch {
+    return segment || url.hostname
+  }
+}
 
 let dragDepth = 0
 window.addEventListener('dragenter', (e) => {

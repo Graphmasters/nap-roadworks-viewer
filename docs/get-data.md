@@ -58,7 +58,8 @@ NAP links to before you publish anything derived from the data.
 
 1. Open [the viewer](https://graphmasters.github.io/nap-roadworks-viewer/).
 2. Drop the file into the window, or click **Open DATEX II file…**. Plain XML and gzip (`.gz`) both
-   work; there is no need to unpack the file first.
+   work; there is no need to unpack the file first. Or paste the file's address into the field in the top bar and
+   click **Open URL**: your browser downloads it from there, and the server must allow cross-origin requests.
 3. A progress bar shows bytes, situations and records while the file loads. Then continue with
    [Using the viewer](usage.md).
 
