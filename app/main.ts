@@ -1,12 +1,13 @@
 import { fetchWayFromOsmApi, type OsmWay } from 'osm-lanes'
 import { linesOf, matchEventRefined, recordWayOrientation, runChecks, type AnalysisResult, type AxisOrder, type Finding } from '../src/index'
-import { formatBytes } from './dom'
+import { formatBytes, h } from './dom'
 import { fetchHighwaysInBbox, fetchHighwaysNear, nearestWay } from './osm'
 import { renderInspector, showReversed, type InspectorState, type Tab } from './inspector'
 import { RoadworksMap } from './map'
 import { RecordList } from './records'
 import { renderReport, type XsdState } from './report'
 import { renderRtti } from './rtti'
+import { URL_EXAMPLES } from './url-examples'
 import type { WorkerRequest, WorkerResponse } from './worker'
 import { validateWithXsd, XSD_MAX_BYTES } from './xsd'
 import './style.css'
@@ -27,6 +28,7 @@ const urlSubmit = $<HTMLButtonElement>('url-submit')
 const urlProgress = $('url-progress')
 const urlProgressBar = $('url-progress-bar')
 const urlProgressText = $('url-progress-text')
+const urlExamples = $('url-examples')
 const reportEl = $('report')
 const rttiEl = $('rtti')
 const inspectorEl = $('inspector')
@@ -444,6 +446,20 @@ urlOpen.addEventListener('click', () => {
 
 urlCancel.addEventListener('click', () => urlDialog.close())
 
+// The examples come from url-examples.ts. Each Open button downloads its file like an address typed into the form.
+const exampleButtons: HTMLButtonElement[] = []
+for (const ex of URL_EXAMPLES) {
+  const button = h('button', { type: 'button', 'aria-label': `Open ${ex.title}`, onclick: () => void loadUrl(new URL(ex.url)) }, 'Open')
+  exampleButtons.push(button)
+  urlExamples.append(h('li', null,
+    h('p', { class: 'example-provider' }, ex.provider),
+    h('p', { class: 'example-title' }, ex.title),
+    h('p', { class: 'example-licence muted' }, 'Licence: ', ex.licence),
+    h('div', { class: 'example-actions' },
+      h('a', { href: ex.portalUrl, target: '_blank', rel: 'noopener noreferrer' }, 'Dataset page on the portal'),
+      button)))
+}
+
 urlForm.addEventListener('submit', (e) => {
   e.preventDefault()
   let url: URL
@@ -485,6 +501,7 @@ function setUrlStage(stage: UrlStage) {
   urlInput.disabled = stage !== 'idle'
   urlSubmit.disabled = stage !== 'idle'
   urlCancel.disabled = stage === 'reading'
+  for (const b of exampleButtons) b.disabled = stage !== 'idle'
 }
 
 function showUrlError(message: string) {
@@ -573,6 +590,27 @@ function fileNameOf(url: URL): string {
   }
 }
 
+/**
+ * `npm run dev:feed -- <file>` opens the page with ?command-line-feed. The development server then serves that one
+ * file from the same origin, and it is analysed like a dropped file.
+ */
+async function loadCommandLineFeed() {
+  let response: Response
+  try {
+    response = await fetch(`${import.meta.env.BASE_URL}command-line-feed`, { cache: 'no-store' })
+  } catch {
+    showLoadError('The file from the command line could not be read. Start the viewer with npm run dev:feed -- <file>.')
+    return
+  }
+  const name = response.headers.get('x-feed-name')
+  if (!response.ok || !name) {
+    showLoadError('No file was given on the command line. Start the viewer with npm run dev:feed -- <file>.')
+    return
+  }
+  const blob = await response.blob()
+  loadFile(new File([blob], decodeURIComponent(name), { type: blob.type }))
+}
+
 let dragDepth = 0
 window.addEventListener('dragenter', (e) => {
   if (!e.dataTransfer?.types.includes('Files')) return
@@ -619,6 +657,9 @@ window.addEventListener('keydown', (e) => {
 
 setMode('records')
 render()
+
+// Opened by npm run dev:feed: load the file that the development server serves.
+if (new URLSearchParams(location.search).has('command-line-feed')) void loadCommandLineFeed()
 
 // Development-only handle for debugging in the browser console.
 if (import.meta.env.DEV) Object.assign(window, { __nrv: { roadMap, state, records } })

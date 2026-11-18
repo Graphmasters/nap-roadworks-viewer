@@ -21,6 +21,7 @@ nav:
   - Home: index.md
   - Get started:
       - Getting a DATEX II file: get-data.md
+      - Open publications: open-publications.md
       - Using the viewer: usage.md
       - XML examples: examples.md
   - What the viewer checks:

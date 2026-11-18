@@ -41,6 +41,7 @@
     "build": "tsup",
     "build:app": "vite build",
     "dev": "vite",
+    "dev:feed": "node scripts/open-feed.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
