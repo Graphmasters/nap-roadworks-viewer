@@ -13,6 +13,8 @@ National Access Points (NAPs), shows their records on a map and compares them wi
 >   account. Your file is analysed in your browser and is never uploaded.
 > - **[Read the documentation →](https://graphmasters.github.io/nap-roadworks-viewer/docs/)** How
 >   to get a feed, use the viewer and read its checks, with tested XML examples.
+> - **[Open publications →](https://graphmasters.github.io/nap-roadworks-viewer/docs/open-publications/)**
+>   Open DATEX II roadworks and closure feeds that the viewer can draw on the map.
 
 [![NAP Roadworks Viewer: the record list on the left, a roadworks record on the map, and the Lanes tab comparing the record's DATEX II lane status with the OpenStreetMap lane layout of the matched road](docs/screenshot.webp)](https://graphmasters.github.io/nap-roadworks-viewer/)
 
@@ -52,7 +54,9 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 ## Quick start
 
 1. Download a DATEX II roadworks or closure publication (v2 or v3) from a National Access Point.
-   Plain XML and gzip both work, also when a gzip file is saved as `.xml`.
+   Plain XML and gzip both work, also when a gzip file is saved as `.xml`. The
+   [open publications](https://graphmasters.github.io/nap-roadworks-viewer/docs/open-publications/)
+   list feeds that need no account.
 2. Open **<https://graphmasters.github.io/nap-roadworks-viewer/>** and drop the file onto the
    page, choose **Open DATEX II file…**, or choose **Open URL…** and paste the file's address.
    The browser downloads the file from that address, so the server must allow cross-origin
@@ -62,6 +66,20 @@ Denmark, Slovenia and Croatia; see [Tested feeds](#tested-feeds)), in DATEX II v
 4. Optional: to validate against the schema, choose **Validate against XSD files…** in the report
    and select the XSD of your DATEX II version or profile, plus any files it imports. The viewer
    does not download schema files; until you select them, the report says "not performed".
+
+## Open a file from the command line
+
+After `npm ci` in a clone of the repository (see [Development](#development)), start the viewer with
+a DATEX II file. Plain XML and gzip both work:
+
+```sh
+npm run dev:feed -- path/to/feed.xml.gz
+```
+
+The development server starts, opens the viewer in your browser and loads the file straight away.
+The path is relative to the directory you run the command in. The file is served only by this local
+server, for as long as it runs; it is not copied into the repository or uploaded. Stop the server
+with Ctrl+C. `npm run dev` starts the viewer without a file, as before.
 
 ## Privacy
 
@@ -185,6 +203,7 @@ git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
 cd nap-roadworks-viewer
 npm ci
 npm run dev          # app at http://localhost:5173/nap-roadworks-viewer/
+npm run dev:feed -- feed.xml   # the same, opened with one DATEX II file (see above)
 npm test             # Vitest with hand-written DATEX II fixtures (test/fixtures.ts)
 npm run typecheck    # tsc --noEmit
 npm run build        # library → dist/

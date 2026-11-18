@@ -52,7 +52,8 @@ register, request access to the offer, then download from the offer page.
 Other NAPs publish their files openly, without an account. An example is the Netherlands: the
 [NDW open data directory](https://opendata.ndw.nu), listed on the Dutch NAP, is a plain list of files
 that you can download in the browser, most of them gzipped DATEX II XML. Check the terms of use the
-NAP links to before you publish anything derived from the data.
+NAP links to before you publish anything derived from the data. The [open publications](open-publications.md)
+list the open feeds that the viewer can draw on the map, with their licences.
 
 ## Open the file in the viewer
 
