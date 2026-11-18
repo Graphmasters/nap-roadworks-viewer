@@ -70,7 +70,8 @@ code {
 
 button,
 select,
-input[type='search'] {
+input[type='search'],
+input[type='url'] {
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -147,6 +148,7 @@ button.linkish {
   font-size: 16px;
   margin: 0 8px 0 0;
 }
+
 
 .modes,
 .views {
@@ -257,11 +259,27 @@ details.block > summary {
   overflow: hidden;
 }
 
-#progress-bar {
+#progress-bar,
+#url-progress-bar {
   height: 100%;
   width: 0;
   background: var(--accent);
   transition: width 0.1s;
+}
+
+/* Download in progress: the size is not known, so the bar only shows that something is moving. */
+.progress.indeterminate .bar > div {
+  width: 35% !important;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  from {
+    margin-left: -35%;
+  }
+  to {
+    margin-left: 100%;
+  }
 }
 
 .report-section h3 {
@@ -661,6 +679,9 @@ body.dragging .dropzone {
   .spinner {
     animation-duration: 2.4s;
   }
+  .progress.indeterminate .bar > div {
+    animation-duration: 3s;
+  }
 }
 
 /* OSM lane graphic with the osm-lanes compass rose (way direction) beside it. */
@@ -865,8 +886,9 @@ table.lrp tr.invalid td {
   font-size: 12px;
 }
 
-/* Privacy dialog, opened from the map attribution. */
-.privacy {
+/* Dialogs: the privacy notice, opened from the map attribution, and the URL input. */
+.privacy,
+.url-dialog {
   max-width: min(36rem, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
@@ -877,14 +899,41 @@ table.lrp tr.invalid td {
   border-radius: 8px;
 }
 
-.privacy::backdrop {
+.privacy::backdrop,
+.url-dialog::backdrop {
   background: rgb(0 0 0 / 0.4);
 }
 
-.privacy h2 {
+.privacy h2,
+.url-dialog h2 {
   margin: 0 0 8px;
   font-size: 1.15rem;
 }
+
+.url-dialog p {
+  margin: 0 0 8px;
+}
+
+.url-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.url-form label {
+  font-weight: 600;
+}
+
+.url-form input {
+  width: 100%;
+}
+
+.url-form .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 
 .privacy ul {
   padding-left: 1.2em;

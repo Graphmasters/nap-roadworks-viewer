@@ -12,6 +12,7 @@
       <h1>NAP Roadworks Viewer</h1>
       <button id="pick" type="button" class="primary">Open DATEX II file…</button>
       <input id="file" type="file" accept=".xml,.gz,application/xml,text/xml,application/gzip" hidden />
+      <button id="url-open" type="button">Open URL…</button>
       <div class="modes" role="group" aria-label="Map click mode">
         <button id="mode-records" type="button">Select record</button>
         <button id="mode-osm" type="button">Select OSM road</button>
@@ -31,7 +32,7 @@
           <h2>Inspect a DATEX II roadworks feed</h2>
           <p>
             Open or drop a DATEX II XML file (v2 or v3, plain or gzip-compressed), for example a roadworks or closure publication
-            downloaded from a National Access Point.
+            downloaded from a National Access Point. Or open one by its address with <strong>Open URL…</strong> in the top bar.
           </p>
           <p><button id="intro-pick" type="button" class="primary">Open file…</button></p>
           <p class="muted">The file is processed in your browser and is not uploaded.</p>
@@ -89,6 +90,10 @@
         The DATEX II file you open is read and analysed in your browser. It is not uploaded or stored. The viewer sets no
         cookies, stores nothing in your browser and uses no analytics.
       </p>
+      <p>
+        If you open a file by its URL, your browser downloads it directly from that host, which sees your IP address like any
+        download. The host must allow cross-origin requests for the viewer to read the file.
+      </p>
       <p>To show the map and look up roads, your browser contacts these services directly. Like every web server, they see your IP address.</p>
       <ul>
         <li>GitHub Pages (<code>graphmasters.github.io</code>): the app and the map style.</li>
@@ -108,6 +113,30 @@
         <a href="https://www.graphmasters.net/imprint" target="_blank" rel="noopener noreferrer">Impressum</a>.
       </p>
       <form method="dialog"><button type="submit" class="primary" autofocus>Close</button></form>
+    </dialog>
+
+    <dialog id="url-dialog" class="url-dialog" aria-labelledby="url-title">
+      <h2 id="url-title">Open a DATEX II file by URL</h2>
+      <p>
+        Paste the address of a DATEX II XML file, plain or gzip-compressed, for example a roadworks or closure publication from a
+        National Access Point. Your browser downloads the file from that address and analyses it on your device.
+      </p>
+      <p class="muted">
+        The server must allow requests from other websites (CORS). If it does not, download the file and drop it onto the page instead.
+      </p>
+      <form id="url-form" class="url-form">
+        <label for="url-input">File address</label>
+        <input id="url-input" type="url" inputmode="url" placeholder="https://…" autocomplete="off" spellcheck="false" required aria-describedby="url-error" />
+        <p id="url-error" class="error" role="alert" hidden></p>
+        <div id="url-progress" class="progress" hidden>
+          <div class="bar"><div id="url-progress-bar"></div></div>
+          <p id="url-progress-text" class="muted" role="status" aria-live="polite"></p>
+        </div>
+        <div class="actions">
+          <button id="url-cancel" type="button">Cancel</button>
+          <button id="url-submit" type="submit" class="primary">Open</button>
+        </div>
+      </form>
     </dialog>
 
     <div class="dropzone" aria-hidden="true"><p>Drop the DATEX II file to analyse it</p></div>
