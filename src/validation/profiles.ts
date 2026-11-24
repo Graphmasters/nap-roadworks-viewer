@@ -3,6 +3,7 @@
 // profile documentation: they are labelled as such and never presented as a full conformance test.
 
 import type { FeedMeta, Finding, RoadEvent } from '../model'
+import { LINEAR_EXTENSION_TEXT } from '../records/normalise'
 
 export interface ProfileContext {
   meta: FeedMeta
@@ -95,6 +96,28 @@ export const PROFILES: Profile[] = [
           layer: 'profile' as const,
           message: 'Record has an AlertC location but no gmlLineString.',
           explanation: 'Heuristic: NDW situation feeds usually add a gmlLineString to every linear location. This record can only be located by decoding AlertC.',
+          situationId: e.situationId,
+          recordIds: [e.id],
+          xmlPath: e.xmlPath,
+        })),
+  },
+  {
+    id: 'de-mdm-traffic-messages-01-00-00',
+    label: 'MDM Verkehrsmeldungen 01-00-00 (DE)',
+    datexVersion: '2',
+    description:
+      'German MDM "Datenmodell für Verkehrsmeldungen" 01-00-00 on DATEX II v2.1. Its georeferencing table is binding: a linear location may only use a method the table marks. Checks are heuristic. Selected by hand, never automatically: the feeds seen so far carry nothing that identifies this profile.',
+    detect: () => 0,
+    checks: ({ events }) =>
+      events
+        .filter((e) => e.locationMethods.includes(LINEAR_EXTENSION_TEXT))
+        .map((e) => ({
+          ruleId: 'VM-H01',
+          severity: 'warning' as const,
+          layer: 'profile' as const,
+          message: 'Linear location given as coordinate text in linearExtension.',
+          explanation:
+            'Heuristic: the georeferencing table of this profile marks no coordinate-based method for linear locations, and its linearExtension defines only extendedLinear and openlrExtendedLinear. The schema accepts this text only through a wildcard that does not check its content. Points of a linear location belong in extendedLinear (ISO 19148, methodName ByPoints), as referents with coordinates.',
           situationId: e.situationId,
           recordIds: [e.id],
           xmlPath: e.xmlPath,

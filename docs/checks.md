@@ -31,7 +31,11 @@ Profile detection with heuristic rules for:
 - the German roadworks profile (MDM roadworks profile 04-00-00, *Baustellenprofil*), for example
   records without `laneStatusCoded` (`MDM-H01`) or traffic-management records without a
   `managedCause` link (`MDM-H02`);
-- Dutch situation feeds (DATEX II v3).
+- Dutch situation feeds (DATEX II v3);
+- the German traffic-message profile (MDM Verkehrsmeldungen 01-00-00). It is never detected
+  automatically, so pick it in the report. A linear location whose coordinates are plain text in a
+  `linearExtension` is flagged (`VM-H01`), because that profile's georeferencing table marks no
+  coordinate-based method for linear locations.
 
 Other feeds get a generic DATEX II v2 or v3 profile without profile-specific checks.
 
