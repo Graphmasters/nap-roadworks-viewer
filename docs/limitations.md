@@ -12,6 +12,8 @@ What the viewer does not do should be as clear as what it does.
 ## Location referencing
 
 A `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in WGS 84 degrees is drawn as a line.
+Some publishers, the Hamburg feed among them, write the same coordinates as a plain `lat lon` list in
+the text of a v2 `linearExtension` instead of a `posList`; those are drawn as a line too.
 A record without one is drawn from the `LinearElementByPoints` of a linear location: a line through
 its points, cut to `fromPoint`/`toPoint`, with distances measured along the points. A
 `LinearElementByPoints` in a `pointAlongLinearElement` is not drawn as a line, because the point along

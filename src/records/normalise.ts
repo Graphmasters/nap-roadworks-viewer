@@ -61,6 +61,8 @@ export const DISPLAY_POINT_ELEMENTS = ['locationForDisplay', 'coordinatesForDisp
 /** Raw coordinates kept until the file-wide axis order is known. */
 export interface PendingGeometry {
   lines: number[][]
+  /** Lines written as bare "lat lon" text in a linearExtension, not as a posList (same reading as `lines`). */
+  textLines?: number[][]
   /** LinearElementByPoints polylines, cut to their fromPoint/toPoint (explicit lat/lon). */
   elementLines: LinearElementLine[]
   /** LinearElementByPoints read from linear locations, including those that could not be drawn. */
@@ -272,6 +274,7 @@ function normaliseRecord(
     if (m) methods.add(m)
   }
   const geometry = collectGeometry(location, [])
+  if (geometry.textLines?.length) methods.add('gmlLineString')
   const openlr = decodeOpenlr(location, basePath)
   if (openlr.some((r) => r.encoding === 'structured')) methods.add('OpenLR (structured)')
   if (openlr.some((r) => r.encoding === 'binary')) methods.add('OpenLR (binary)')
@@ -372,6 +375,15 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     }
     lines.push(flat)
   }
+  // Some feeds (the Hamburg publication, for one) write the line as bare "lat lon" text in a
+  // linearExtension instead of a posList. It is read like a posList.
+  const textLines: number[][] = []
+  for (const le of descendants(location, 'linearExtension')) {
+    const tokens = bareCoordinateTokens(le)
+    if (!tokens) continue
+    noteDecimals(tokens)
+    textLines.push(tokens.map(Number))
+  }
   const points: Array<[number, number]> = []
   let displayOnly = true
   for (const pc of descendants(location, 'pointCoordinates')) {
@@ -393,5 +405,18 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     }
   }
   const byPoints = linearElementLines(location, warnings)
-  return { lines, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+  return { lines, textLines, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+}
+
+/**
+ * The text of a `linearExtension` that is nothing but a list of WGS 84 numbers, e.g.
+ * `<linearExtension><xs:any>53.6 10.0 53.7 10.1</xs:any></linearExtension>`: at least two
+ * positions, all within ±180. Undefined for structured extensions (gml, OpenLR, …) and for any
+ * other text.
+ */
+function bareCoordinateTokens(le: XmlElement): string[] | undefined {
+  if (le.children.some((c) => c.children.length)) return undefined
+  const tokens = [le.text, ...le.children.map((c) => c.text)].join(' ').split(/\s+/).filter(Boolean)
+  if (tokens.length < 4 || tokens.length % 2 !== 0) return undefined
+  return tokens.every((t) => Number.isFinite(Number(t)) && Math.abs(Number(t)) <= 180) ? tokens : undefined
 }
