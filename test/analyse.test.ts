@@ -447,3 +447,35 @@ describe('location findings after the OpenLR and LinearElementByPoints geometry'
     expect(finding(r, 'RTTI-LIN-01', 'BP-4-R')).toBeUndefined()
   })
 })
+
+describe('bare coordinate list in a linearExtension', async () => {
+  const { v2Doc, v2Situation, v2Record, LINE_A } = await import('./fixtures')
+  // The Hamburg publication (Mobilithek) writes the line as "lat lon" text in an xs:any, not as a posList.
+  const bare = (text: string) => `<linearExtension><xs:any xmlns:xs="http://www.w3.org/2001/XMLSchema">${text}</xs:any></linearExtension>`
+  const r = await run(
+    v2Doc(
+      v2Situation('BARE-1', v2Record('BARE-1-R', bare(LINE_A))),
+      v2Situation('BARE-TEXT', v2Record('BARE-TEXT-R', bare('see the map'))),
+      v2Situation('BARE-PROJ', v2Record('BARE-PROJ-R', bare('5432100 612345 5432200 612345'))),
+      v2Situation('BARE-ODD', v2Record('BARE-ODD-R', bare('53.5 10.0 53.6'))),
+    ),
+  )
+  const ev = (id: string) => r.events.find((e) => e.id === id)!
+
+  it('draws the coordinates as a line, read as lat lon, like a posList', () => {
+    const e = ev('BARE-1-R')
+    expect(e.geometry).toEqual({ type: 'LineString', coordinates: [[10, 53.5], [10.002, 53.501], [10.004, 53.502]] })
+    expect(e.geometrySource).toBe('gmlLineString')
+    expect(e.geometryConfidence).toBe('direct')
+    expect(e.geometryNote).toMatch(/not a posList/)
+    expect(e.locationMethods).toContain('gmlLineString')
+    expect(r.findings.some((f) => f.ruleId === 'LOC-001' && f.recordIds?.[0] === 'BARE-1-R')).toBe(false)
+  })
+
+  it('reads nothing else as coordinates', () => {
+    for (const id of ['BARE-TEXT-R', 'BARE-PROJ-R', 'BARE-ODD-R']) {
+      expect(ev(id).geometry).toBeUndefined()
+      expect(ev(id).geometryConfidence).toBe('none')
+    }
+  })
+})

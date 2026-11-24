@@ -29,7 +29,7 @@ export function distanceM(lat1: number, lon1: number, lat2: number, lon2: number
 }
 
 export function voteAxisOrder(g: PendingGeometry, votes: AxisVotes): void {
-  for (const line of g.lines) {
+  for (const line of [...g.lines, ...(g.textLines ?? [])]) {
     const a = line[0]!
     const b = line[1]!
     if (Math.abs(a) > 90 && Math.abs(b) <= 90) {
@@ -129,7 +129,7 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
   event.warnings.push(...g.warnings)
   const lines: Array<Array<[number, number]>> = []
   let zeroLength: [number, number] | undefined
-  for (const flat of g.lines) {
+  for (const flat of [...g.lines, ...(g.textLines ?? [])]) {
     const coords = toLonLat(flat, order)
     if (!coords) event.warnings.push('gmlLineString has coordinates outside the WGS 84 range')
     // All positions the same: no length, nothing a line layer can draw. Shown as a point instead.
@@ -150,7 +150,11 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
     ls.length === 1 ? { type: 'LineString', coordinates: ls[0]! } : { type: 'MultiLineString', coordinates: ls }
 
   if (lines.length) {
-    set(line(lines), 'gmlLineString', 'direct', `Line geometry taken directly from DATEX II (gmlLineString, read as ${order === 'latlon' ? 'lat lon' : 'lon lat'}).`)
+    const read = order === 'latlon' ? 'lat lon' : 'lon lat'
+    const note = g.lines.length
+      ? `Line geometry taken directly from DATEX II (gmlLineString, read as ${read}).`
+      : `Line geometry taken directly from DATEX II: the coordinates are plain text in a linearExtension, not a posList, read as ${read}.`
+    set(line(lines), 'gmlLineString', 'direct', note)
     return
   }
   if (g.elementLines.length) {
