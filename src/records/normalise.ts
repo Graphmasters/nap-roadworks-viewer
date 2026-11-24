@@ -58,6 +58,9 @@ const LOCATION_METHODS: Record<string, string> = {
 /** Display-only point elements: v2 `locationForDisplay`, v3 `coordinatesForDisplay`. */
 export const DISPLAY_POINT_ELEMENTS = ['locationForDisplay', 'coordinatesForDisplay']
 
+/** Location method of a line written as coordinate text in a linearExtension (see collectGeometry). */
+export const LINEAR_EXTENSION_TEXT = 'linearExtension (coordinate text)'
+
 /** Raw coordinates kept until the file-wide axis order is known. */
 export interface PendingGeometry {
   lines: number[][]
@@ -274,7 +277,10 @@ function normaliseRecord(
     if (m) methods.add(m)
   }
   const geometry = collectGeometry(location, [])
-  if (geometry.textLines?.length) methods.add('gmlLineString')
+  if (geometry.textLines?.length) {
+    methods.add('gmlLineString')
+    methods.add(LINEAR_EXTENSION_TEXT)
+  }
   const openlr = decodeOpenlr(location, basePath)
   if (openlr.some((r) => r.encoding === 'structured')) methods.add('OpenLR (structured)')
   if (openlr.some((r) => r.encoding === 'binary')) methods.add('OpenLR (binary)')

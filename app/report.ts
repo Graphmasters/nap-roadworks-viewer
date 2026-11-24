@@ -53,6 +53,7 @@ export const RULE_TITLE: Record<string, string> = {
   'MDM-H01': 'Works record without lane status',
   'MDM-H02': 'Management record without cause link',
   'NDW-H01': 'AlertC location without gmlLineString',
+  'VM-H01': 'Linear location as coordinate text in linearExtension',
   'OLR-001': 'OpenLR coordinate missing or not a number',
   'OLR-002': 'OpenLR coordinate not WGS 84 degrees',
   'OLR-003': 'OpenLR latitude/longitude swapped',

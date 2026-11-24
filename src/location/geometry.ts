@@ -7,7 +7,7 @@
 
 import type { AxisOrder, AxisOrderDecision, GeometrySource, OpenlrReference, RoadEvent } from '../model'
 import { validWgs84 } from './openlr'
-import type { PendingGeometry } from '../records/normalise'
+import { LINEAR_EXTENSION_TEXT, type PendingGeometry } from '../records/normalise'
 
 export interface AxisVotes {
   latlon: number
@@ -197,7 +197,7 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
 }
 
 /** Location methods whose absence of a drawing is explained per reference, not as "not decoded". */
-const EXPLAINED_METHODS = new Set(['gmlLineString', 'pointCoordinates', 'locationForDisplay', 'coordinatesForDisplay', 'OpenLR (structured)'])
+const EXPLAINED_METHODS = new Set(['gmlLineString', 'pointCoordinates', 'locationForDisplay', 'coordinatesForDisplay', 'OpenLR (structured)', LINEAR_EXTENSION_TEXT])
 
 const VIEWER_LIMITATION = 'This is a limitation of the viewer, not an error in the feed.'
 

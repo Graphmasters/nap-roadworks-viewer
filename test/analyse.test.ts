@@ -479,3 +479,24 @@ describe('bare coordinate list in a linearExtension', async () => {
     }
   })
 })
+
+describe('Verkehrsmeldungen profile (MDM 01-00-00)', async () => {
+  const { v2Doc, v2Situation, v2Record, LINE_A } = await import('./fixtures')
+  const VM = 'de-mdm-traffic-messages-01-00-00'
+  const text = `<linearExtension><xs:any xmlns:xs="http://www.w3.org/2001/XMLSchema">${LINE_A}</xs:any></linearExtension>`
+  const posList = `<linearExtension><linearExtended><gmlLineString><posList>${LINE_A}</posList></gmlLineString></linearExtended></linearExtension>`
+  const doc = v2Doc(v2Situation('VM-1', v2Record('VM-1-R', text)), v2Situation('VM-2', v2Record('VM-2-R', posList)))
+
+  it('is never detected automatically', async () => {
+    expect((await analyseDatex(sourceFromBytes(doc))).profileId).not.toBe(VM)
+  })
+
+  it('flags coordinate text in a linearExtension when selected (VM-H01), and only that', async () => {
+    const r = await analyseDatex(sourceFromBytes(doc), { profileId: VM })
+    expect(r.profileId).toBe(VM)
+    const hits = r.findings.filter((f) => f.ruleId === 'VM-H01')
+    expect(hits.map((f) => f.recordIds?.[0])).toEqual(['VM-1-R'])
+    expect(hits[0]).toMatchObject({ severity: 'warning', layer: 'profile' })
+    expect(hits[0]!.explanation).toMatch(/Heuristic: the georeferencing table of this profile/)
+  })
+})
