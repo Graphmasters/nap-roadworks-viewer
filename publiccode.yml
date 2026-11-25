@@ -3,7 +3,7 @@ publiccodeYmlVersion: "0"
 name: NAP Roadworks Viewer
 url: "https://github.com/Graphmasters/nap-roadworks-viewer.git"
 landingURL: "https://graphmasters.github.io/nap-roadworks-viewer/"
-softwareVersion: "1.0.0"
+softwareVersion: "1.0.1"
 
 platforms:
   - web
