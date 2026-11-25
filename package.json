@@ -1,5 +1,5 @@
 {
-  "name": "@graphmasters/nap-roadworks-viewer",
+  "name": "nap-roadworks-viewer",
   "version": "1.0.0",
   "description": "Inspect DATEX II roadworks and road-closure feeds in the browser: XML/profile checks, map, OSM road lookup, lane comparison and passability analysis.",
   "keywords": [

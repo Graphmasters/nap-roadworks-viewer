@@ -11,16 +11,16 @@ git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
 cd nap-roadworks-viewer
 npm ci
 npm run build    # library → dist/
-npm pack         # → graphmasters-nap-roadworks-viewer-<version>.tgz
+npm pack         # → nap-roadworks-viewer-<version>.tgz
 ```
 
 Install the archive in your project with
-`npm install /path/to/graphmasters-nap-roadworks-viewer-<version>.tgz`, using the file name that
+`npm install /path/to/nap-roadworks-viewer-<version>.tgz`, using the file name that
 `npm pack` prints. Then:
 
 ```ts
 import { openAsBlob } from 'node:fs'
-import { analyseDatex } from '@graphmasters/nap-roadworks-viewer'
+import { analyseDatex } from 'nap-roadworks-viewer'
 
 const blob = await openAsBlob('feed.xml.gz')     // plain or gzip
 const result = await analyseDatex({ size: blob.size, stream: () => blob.stream() })
