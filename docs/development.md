@@ -3,20 +3,14 @@
 ## Library
 
 The analysis runs without the UI, in the browser or in Node.js ≥ 20, so the same checks can run in a
-pipeline. It is not published on npm yet, so build a package from source (building needs a newer
-Node.js, see [Development](#development)):
+pipeline. It is published on npm as
+[`nap-roadworks-viewer`](https://www.npmjs.com/package/nap-roadworks-viewer):
 
 ```sh
-git clone https://github.com/Graphmasters/nap-roadworks-viewer.git
-cd nap-roadworks-viewer
-npm ci
-npm run build    # library → dist/
-npm pack         # → nap-roadworks-viewer-<version>.tgz
+npm install nap-roadworks-viewer
 ```
 
-Install the archive in your project with
-`npm install /path/to/nap-roadworks-viewer-<version>.tgz`, using the file name that
-`npm pack` prints. Then:
+To build the package from source instead, see [Development](#development). Then:
 
 ```ts
 import { openAsBlob } from 'node:fs'
