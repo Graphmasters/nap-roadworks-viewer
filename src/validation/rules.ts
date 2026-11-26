@@ -142,6 +142,18 @@ export function recordChecks(events: RoadEvent[], meta: FeedMeta, duplicateIds: 
       })
     for (const w of e.warnings)
       out.push({ ruleId: 'LOC-003', severity: 'warning', layer: 'location', message: w, situationId: e.situationId, recordIds: [e.id], xmlPath: e.xmlPath })
+    if (e.crsLabelMismatch)
+      out.push({
+        ruleId: 'LOC-005',
+        severity: 'warning',
+        layer: 'location',
+        message: `gmlLineString is labelled ${e.crsLabelMismatch} but its coordinates are degrees.`,
+        explanation: `${e.crsLabelMismatch} is a metre-based UTM zone, so degree values cannot be correct under that label. That line is not drawn and is not checked for RTTI indicators; the record falls back to its other location references, if it has any.`,
+        remedy: 'Publish the posList in the CRS named by srsName, or label degree values EPSG:4326.',
+        situationId: e.situationId,
+        recordIds: [e.id],
+        xmlPath: e.xmlPath,
+      })
 
     const sums = e.laneCodes.map((c) => ({ c, s: summariseLaneCode(c.value) }))
     for (const { c, s } of sums)

@@ -69,6 +69,8 @@ export interface PendingGeometry {
   textLines?: number[][]
   /** gmlLineStrings in ETRS89 / UTM (EPSG:25832 or 25833), converted to flat [lat, lon, …] in WGS 84 degrees. */
   projectedLines?: Array<{ epsg: 25832 | 25833; flat: number[] }>
+  /** A gmlLineString labelled ETRS89 / UTM whose coordinates are degrees. Not drawn, not checked. */
+  labelMismatch?: 'EPSG:25832' | 'EPSG:25833'
   /** LinearElementByPoints polylines, cut to their fromPoint/toPoint (explicit lat/lon). */
   elementLines: LinearElementLine[]
   /** LinearElementByPoints read from linear locations, including those that could not be drawn. */
@@ -356,6 +358,7 @@ function normaliseRecord(
 function collectGeometry(location: XmlElement, warnings: string[]): PendingGeometry {
   const lines: number[][] = []
   const projectedLines: Array<{ epsg: 25832 | 25833; flat: number[] }> = []
+  let labelMismatch: 'EPSG:25832' | 'EPSG:25833' | undefined
   let decimals: number | undefined
   // Only values that can be WGS 84 degrees count: projected coordinates (metres) say nothing
   // about the resolution in degrees.
@@ -385,6 +388,12 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
       continue
     }
     if (zone) {
+      // Degrees under a UTM label: the label contradicts the values, so the line is neither drawn nor
+      // reinterpreted. UTM eastings and northings are never within ±180 for these zones.
+      if (flat.every((v) => Math.abs(v) <= 180)) {
+        labelMismatch ??= zone === 32 ? 'EPSG:25832' : 'EPSG:25833'
+        continue
+      }
       // Metres in ETRS89 / UTM: converted here, so the file's axis-order vote never sees them.
       const wgs: number[] = []
       for (let i = 0; i < flat.length; i += 2) wgs.push(...utmToWgs84(zone, flat[i]!, flat[i + 1]!))
@@ -423,7 +432,7 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     }
   }
   const byPoints = linearElementLines(location, warnings)
-  return { lines, textLines, projectedLines, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+  return { lines, textLines, projectedLines, labelMismatch, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
 }
 
 /**

@@ -127,6 +127,7 @@ const fmtM = (m: number) => `${Math.round(m)} m`
  */
 export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisOrder): void {
   event.warnings.push(...g.warnings)
+  if (g.labelMismatch) event.crsLabelMismatch = g.labelMismatch
   const lines: Array<Array<[number, number]>> = []
   let zeroLength: [number, number] | undefined
   const sources: Array<{ flat: number[]; lineOrder: AxisOrder }> = [

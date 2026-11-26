@@ -60,6 +60,7 @@ lane status and location methods. Checks on this level include:
 | `LOC-002` | *Approximate location*: point coordinates or a display point only, a straight line through OpenLR points, or a zero-length `gmlLineString` drawn as a point |
 | `LOC-003` | *Location warnings*, e.g. a `LinearElementByPoints` without a valid start or end point, or with `fromPoint`/`toPoint` outside the element |
 | `LOC-004` | `gmlLineString` positions read as "lon lat": one finding for the whole file, because the axis order is decided once per file (also raised when you set "lon lat" by hand) |
+| `LOC-005` | `gmlLineString` labelled EPSG:25832 or EPSG:25833 whose coordinates are degrees, not metres. The label contradicts the values, so the line is neither drawn nor checked for RTTI indicators |
 | `LANE-001` … `LANE-003` | Unknown lane-status symbols, basic and extended lane status disagree, more lanes restricted than exist |
 | `REF-001` … `REF-003` | `managedCause` link not in the file, cyclic cause links, cause in another situation |
 | `DQ-RW-001`, `DQ-RW-002` | Closures that contradict their lane evidence ([details](passability.md#contradictions)) |

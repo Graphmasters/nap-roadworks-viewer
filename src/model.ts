@@ -168,6 +168,8 @@ export interface RoadEvent {
   geometryNote?: string
   /** Location element the drawn geometry was built from. */
   geometrySource?: GeometrySource
+  /** Set when a gmlLineString is labelled EPSG:25832 or EPSG:25833 but its coordinates are degrees: not drawn, not checked. */
+  crsLabelMismatch?: 'EPSG:25832' | 'EPSG:25833'
   /** Location referencing methods present in the record (gmlLineString, alertC, openlr, …). */
   locationMethods: string[]
   roadNumber?: string

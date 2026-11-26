@@ -45,6 +45,7 @@ export const RULE_TITLE: Record<string, string> = {
   'LOC-002': 'Approximate location',
   'LOC-003': 'Location warnings',
   'LOC-004': 'posList in lon/lat order',
+  'LOC-005': 'posList labelled UTM but in degrees',
   'LANE-001': 'Unknown lane-status symbols',
   'LANE-002': 'Basic and extended lane status differ',
   'LANE-003': 'More lanes restricted than exist',
