@@ -367,9 +367,9 @@ export function assessRtti(result: Pick<AnalysisResult, 'meta' | 'situations' | 
         ? { status: 'not-checked', how: 'the polyline is not in WGS 84 degrees, so its direction cannot be checked here' }
         : directionOf(e, line, bad)
       if (projected)
-        add('RTTI-LIN-03', 'info', 'The polyline is not in WGS 84 degrees; direction and accuracy are not checked.', e, {
+        add('RTTI-LIN-03', 'info', 'The polyline is in a coordinate reference system this viewer does not reproject; direction and accuracy are not checked.', e, {
           explanation:
-            'The gmlLineString uses another coordinate reference system (srsName), e.g. projected metres. It counts as a polyline, but this viewer does not reproject it, so it is not drawn and the direction and accuracy indicators skip it.',
+            'The gmlLineString uses a projected coordinate reference system (srsName) other than ETRS89 / UTM zones 32 and 33 (EPSG:25832, EPSG:25833), which the viewer reprojects. It counts as a polyline, but this viewer does not reproject it, so it is not drawn and the direction and accuracy indicators skip it.',
         })
       if (poly.line && poly.defects.length)
         add('RTTI-LIN-02', 'warning', `Polyline defects: ${poly.defects.join(', ')}.`, e)

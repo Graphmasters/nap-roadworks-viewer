@@ -52,7 +52,7 @@ Keyboard: ↑ / ↓ move through the list, Esc clears the selection.
 The map shows the records that pass the list filters. Each record is drawn from the best location it
 has, in this order:
 
-1. a `gmlLineString`, drawn as a line;
+1. a `gmlLineString`, drawn as a line (ETRS89 / UTM zone 32N or 33N is reprojected to WGS 84 first);
 2. a `LinearElementByPoints` in a linear location (`linearWithinLinearElement`): a line through its
    points, cut to the section between its `fromPoint` and `toPoint` (distances measured along the
    points);

@@ -114,7 +114,8 @@ The main ones are below; the
 documentation has the full list.
 
 - **Location referencing.** Lines are drawn from `gmlLineString` (v2 `linearExtension`, v3
-  `LinearLocation`) in WGS 84 degrees and from a `LinearElementByPoints` in a linear location; in a
+  `LinearLocation`) in WGS 84 degrees or in ETRS89 / UTM zone 32N or 33N (reprojected), and from a
+  `LinearElementByPoints` in a linear location; in a
   `pointAlongLinearElement` its points are shown as points. OpenLR is not map-matched: a record
   whose only line is OpenLR is drawn as an *approximate* straight line through its points. That
   line is chosen before the checks run, so it is drawn even when its points fail `OLR-003` or

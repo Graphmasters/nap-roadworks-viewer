@@ -12,6 +12,10 @@ What the viewer does not do should be as clear as what it does.
 ## Location referencing
 
 A `gmlLineString` (v2 `linearExtension`, v3 `LinearLocation`) in WGS 84 degrees is drawn as a line.
+A `gmlLineString` in ETRS89 / UTM zone 32N or 33N (`srsName` EPSG:25832 or EPSG:25833, metres) is
+reprojected to WGS 84 and drawn the same way. ETRS89 and WGS 84 differ by less than a metre, so the
+result is taken as WGS 84. Other projected coordinate systems are not reprojected: such a line is
+counted as a polyline for RTTI but not drawn, and its direction and accuracy are not checked.
 Some publishers, the Hamburg feed among them, write the same coordinates as a plain `lat lon` list in
 the text of a v2 `linearExtension` instead of a `posList`; those are drawn as a line too.
 A record without one is drawn from the `LinearElementByPoints` of a linear location: a line through

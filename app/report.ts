@@ -63,7 +63,7 @@ export const RULE_TITLE: Record<string, string> = {
   'RTTI-LOC-01': 'No location reference that counts for RTTI',
   'RTTI-LIN-01': 'No polyline (RTTI linear referencing)',
   'RTTI-LIN-02': 'Polyline defects',
-  'RTTI-LIN-03': 'Polyline not in WGS 84 (not checked)',
+  'RTTI-LIN-03': 'Polyline in an unsupported CRS (not checked)',
   'RTTI-DIR-01': 'Direction along the polyline ambiguous',
   'RTTI-DIR-02': 'OpenLR contradicts the polyline',
   'RTTI-DIR-03': 'Location references disagree on direction',

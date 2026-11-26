@@ -129,8 +129,13 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
   event.warnings.push(...g.warnings)
   const lines: Array<Array<[number, number]>> = []
   let zeroLength: [number, number] | undefined
-  for (const flat of [...g.lines, ...(g.textLines ?? [])]) {
-    const coords = toLonLat(flat, order)
+  const sources: Array<{ flat: number[]; lineOrder: AxisOrder }> = [
+    ...[...g.lines, ...(g.textLines ?? [])].map((flat) => ({ flat, lineOrder: order })),
+    // Already converted from ETRS89 / UTM to [lat, lon] in WGS 84 degrees (see collectGeometry).
+    ...(g.projectedLines ?? []).map((p) => ({ flat: p.flat, lineOrder: 'latlon' as const })),
+  ]
+  for (const { flat, lineOrder } of sources) {
+    const coords = toLonLat(flat, lineOrder)
     if (!coords) event.warnings.push('gmlLineString has coordinates outside the WGS 84 range')
     // All positions the same: no length, nothing a line layer can draw. Shown as a point instead.
     else if (coords.every(([x, y]) => x === coords[0]![0] && y === coords[0]![1])) zeroLength ??= coords[0]
@@ -151,9 +156,12 @@ export function applyGeometry(event: RoadEvent, g: PendingGeometry, order: AxisO
 
   if (lines.length) {
     const read = order === 'latlon' ? 'lat lon' : 'lon lat'
-    const note = g.lines.length
-      ? `Line geometry taken directly from DATEX II (gmlLineString, read as ${read}).`
-      : `Line geometry taken directly from DATEX II: the coordinates are plain text in a linearExtension, not a posList, read as ${read}.`
+    const direct = g.lines.length + (g.textLines?.length ?? 0) > 0
+    const note = !direct
+      ? `Line geometry taken directly from DATEX II: gmlLineString in EPSG:${g.projectedLines?.[0]?.epsg} (ETRS89 / UTM), reprojected to WGS 84. ETRS89 and WGS 84 differ by less than a metre.`
+      : g.lines.length
+        ? `Line geometry taken directly from DATEX II (gmlLineString, read as ${read}).`
+        : `Line geometry taken directly from DATEX II: the coordinates are plain text in a linearExtension, not a posList, read as ${read}.`
     set(line(lines), 'gmlLineString', 'direct', note)
     return
   }
