@@ -253,9 +253,9 @@ describe('RTTI direction sub-criterion', () => {
     expect(ceiling(r, 'plannedRoadworks', 'linearReferencing')).toBe(0)
   })
 
-  it('counts a polyline in a projected CRS but does not check its direction', async () => {
-    const utm = `<linearExtension><linearExtended><gmlLineString srsName="25833"><posList>328036.75 7104847.08 328093.1 7104801.7 328131.3 7104772</posList></gmlLineString></linearExtended></linearExtension>`
-    const r = await run(v2Doc(v2Situation('P-1', v2Record('P-1-W', utm))))
+  it('counts a polyline in another projected CRS but does not check its direction', async () => {
+    const other = `<linearExtension><linearExtended><gmlLineString srsName="EPSG:31467"><posList>328036.75 7104847.08 328093.1 7104801.7 328131.3 7104772</posList></gmlLineString></linearExtended></linearExtension>`
+    const r = await run(v2Doc(v2Situation('P-1', v2Record('P-1-W', other))))
     expect(recordsWith(r, 'RTTI-LIN-03')).toEqual(['P-1-W'])
     expect(rules(r).has('RTTI-LIN-01')).toBe(false)
     expect(ceiling(r, 'plannedRoadworks', 'linearReferencing')).toBe(5)
@@ -263,6 +263,36 @@ describe('RTTI direction sub-criterion', () => {
     expect(ceiling(r, 'plannedRoadworks', 'direction')).toBe(5)
     // Projected metres say nothing about the resolution in degrees.
     expect(r.events[0]!.coordinateDecimals).toBeUndefined()
+  })
+
+  it('reprojects an ETRS89 / UTM 32N polyline to WGS 84, draws it and checks its direction', async () => {
+    // Synthetic: 500 km easting on the 9° E meridian at 45° N, then 1 km and 2 km further east.
+    const utm = `<linearExtension><linearExtended><gmlLineString><srsName>ETRS89 EPSG 25832</srsName><posList>500000 4982950.4 501000 4982950.4 502000 4982950.4</posList></gmlLineString></linearExtended></linearExtension>`
+    const r = await run(v2Doc(v2Situation('U-1', v2Record('U-1-W', utm))))
+    const ev = r.events[0]!
+    expect(ev.geometrySource).toBe('gmlLineString')
+    expect(ev.geometryConfidence).toBe('direct')
+    const coords = (ev.geometry as { coordinates: number[][] }).coordinates
+    expect(coords).toHaveLength(3)
+    expect(coords[0]![1]).toBeCloseTo(45, 6)
+    expect(coords[0]![0]).toBeCloseTo(9, 9)
+    expect(coords[2]![0]!).toBeGreaterThan(coords[0]![0]!)
+    expect(ev.warnings.some((w) => w.includes('outside the WGS 84 range'))).toBe(false)
+    expect(rules(r).has('RTTI-LIN-03')).toBe(false)
+    expect(criterion(r, 'plannedRoadworks', 'linearReferencing').distribution).toEqual([{ label: 'gmlLineString', count: 1 }])
+    expect(criterion(r, 'plannedRoadworks', 'direction').distribution).not.toEqual([{ label: 'not checked (not WGS 84)', count: 1 }])
+  })
+
+  it('reprojects a polyline with srsName="25833" (UTM 33N, central meridian 15° E) to WGS 84', async () => {
+    // Synthetic: the same northing as the 9° E test, on the 15° E meridian of zone 33.
+    const utm = `<linearExtension><linearExtended><gmlLineString srsName="25833"><posList>500000 4982950.4 501000 4982950.4</posList></gmlLineString></linearExtended></linearExtension>`
+    const r = await run(v2Doc(v2Situation('U-2', v2Record('U-2-W', utm))))
+    const ev = r.events[0]!
+    expect(ev.geometrySource).toBe('gmlLineString')
+    const coords = (ev.geometry as { coordinates: number[][] }).coordinates
+    expect(coords[0]![1]!).toBeCloseTo(45, 6)
+    expect(coords[0]![0]!).toBeCloseTo(15, 9)
+    expect(rules(r).has('RTTI-LIN-03')).toBe(false)
   })
 
   it('counts a structured OpenLR line as a polyline unless its points are invalid or over 15 km apart', async () => {

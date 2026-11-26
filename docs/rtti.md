@@ -74,8 +74,10 @@ contradiction (`RTTI-DIR-02`); references that disagree make it ambiguous (`RTTI
   map draws from a `LinearElementByPoints` does not count: a record with only that has no polyline
   (`RTTI-LIN-01`). Polyline defects (`RTTI-LIN-02`) and points far from the polyline (`RTTI-ACC-02`) are
   checked on a `gmlLineString` only.
-- **Polylines in other coordinate systems.** A `gmlLineString` in another CRS (e.g. `srsName="25833"`)
-  counts as a polyline, but its direction and accuracy are not checked (`RTTI-LIN-03`).
+- **Polylines in other coordinate systems.** A `gmlLineString` in ETRS89 / UTM zone 32N or 33N
+  (`srsName` EPSG:25832 or EPSG:25833) is reprojected to WGS 84 and checked like any other polyline.
+  A `gmlLineString` in any other CRS (e.g. `srsName="EPSG:31467"`) counts as a polyline, but its
+  direction and accuracy are not checked (`RTTI-LIN-03`).
 
 ## Official assessment
 

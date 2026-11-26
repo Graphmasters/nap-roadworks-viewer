@@ -5,6 +5,7 @@ import type { LaneCode, LaneDetail, LaneImpact, RestrictionType, RoadEvent, Situ
 import { laneEvidenceOf, laneStatesFromCode } from '../lanes/codes'
 import { linearElementLines, type LinearElementLine } from '../location/linear-element'
 import { decodeOpenlr } from '../location/openlr'
+import { utmToWgs84, utmZoneOf } from '../location/projection'
 import {
   child,
   childrenNamed,
@@ -66,6 +67,10 @@ export interface PendingGeometry {
   lines: number[][]
   /** Lines written as bare "lat lon" text in a linearExtension, not as a posList (same reading as `lines`). */
   textLines?: number[][]
+  /** gmlLineStrings in ETRS89 / UTM (EPSG:25832 or 25833), converted to flat [lat, lon, …] in WGS 84 degrees. */
+  projectedLines?: Array<{ epsg: 25832 | 25833; flat: number[] }>
+  /** A gmlLineString labelled ETRS89 / UTM whose coordinates are degrees. Not drawn, not checked. */
+  labelMismatch?: 'EPSG:25832' | 'EPSG:25833'
   /** LinearElementByPoints polylines, cut to their fromPoint/toPoint (explicit lat/lon). */
   elementLines: LinearElementLine[]
   /** LinearElementByPoints read from linear locations, including those that could not be drawn. */
@@ -352,6 +357,8 @@ function normaliseRecord(
 
 function collectGeometry(location: XmlElement, warnings: string[]): PendingGeometry {
   const lines: number[][] = []
+  const projectedLines: Array<{ epsg: 25832 | 25833; flat: number[] }> = []
+  let labelMismatch: 'EPSG:25832' | 'EPSG:25833' | undefined
   let decimals: number | undefined
   // Only values that can be WGS 84 degrees count: projected coordinates (metres) say nothing
   // about the resolution in degrees.
@@ -362,8 +369,9 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     const pl = child(ls, 'posList') ?? firstDescendant(ls, 'posList')
     if (!pl) continue
     const dim = Number(pl.attrs['srsDimension'] ?? ls.attrs['srsDimension'] ?? 2) || 2
+    const zone = utmZoneOf(ls.attrs['srsName'] ?? child(ls, 'srsName')?.text)
     const tokens = pl.text.split(/[\s,]+/).filter(Boolean)
-    if (tokens.every((t) => Math.abs(Number(t)) <= 180)) noteDecimals(tokens)
+    if (!zone && tokens.every((t) => Math.abs(Number(t)) <= 180)) noteDecimals(tokens)
     const values = tokens.map(Number)
     if (values.some((v) => !Number.isFinite(v))) {
       warnings.push('posList contains values that are not numbers')
@@ -377,6 +385,19 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     for (let i = 0; i < values.length; i += dim) flat.push(values[i]!, values[i + 1]!)
     if (flat.length < 4) {
       warnings.push('gmlLineString has fewer than two positions')
+      continue
+    }
+    if (zone) {
+      // Degrees under a UTM label: the label contradicts the values, so the line is neither drawn nor
+      // reinterpreted. UTM eastings and northings are never within ±180 for these zones.
+      if (flat.every((v) => Math.abs(v) <= 180)) {
+        labelMismatch ??= zone === 32 ? 'EPSG:25832' : 'EPSG:25833'
+        continue
+      }
+      // Metres in ETRS89 / UTM: converted here, so the file's axis-order vote never sees them.
+      const wgs: number[] = []
+      for (let i = 0; i < flat.length; i += 2) wgs.push(...utmToWgs84(zone, flat[i]!, flat[i + 1]!))
+      projectedLines.push({ epsg: zone === 32 ? 25832 : 25833, flat: wgs })
       continue
     }
     lines.push(flat)
@@ -411,7 +432,7 @@ function collectGeometry(location: XmlElement, warnings: string[]): PendingGeome
     }
   }
   const byPoints = linearElementLines(location, warnings)
-  return { lines, textLines, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
+  return { lines, textLines, projectedLines, labelMismatch, elementLines: byPoints.lines, elementsByPoints: byPoints.elements, points, displayOnly: points.length > 0 && displayOnly, coordinateDecimals: decimals, warnings }
 }
 
 /**
